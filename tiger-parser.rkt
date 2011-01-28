@@ -1,7 +1,8 @@
 #lang racket
 (require parser-tools/lex
          parser-tools/yacc
-         (prefix-in : parser-tools/lex-sre))
+         (prefix-in : parser-tools/lex-sre)
+         "source-ast.rkt")
 
 (define-tokens lang-tokens (integer identifier comparison */))
 (define-empty-tokens lang-empty-tokens
@@ -65,56 +66,60 @@
    (grammar
     (decs (() empty)
           ((dec decs) (cons $1 $2)))
-    (dec ((type id equal ty) (list 'type $2 $4))
-         ((var id assignment expr) (list 'var $2 $4 'any))
-         ((var id colon id assignment expr) (list 'var $2 $6 $4))
+    (dec ((type id equal ty) (make-type-declaration $2 $4))
+         ((var id assignment expr)
+          (make-untyped-variable-declaration $2 $4))
+         ((var id colon id assignment expr)
+          (make-variable-declaration $2 $4 $6))
          ((function id open-paren tyfields close-paren equal expr)
-          (list 'function $2 $4 $7 'any))
+          (make-function-type $2 $4 (make-unit-type) $7))
          ((function id open-paren tyfields close-paren colon id equal expr)
-          (list 'function $2 $4 $9 $7)))
+          (make-function-type $2 $4 $7 $9)))
     (ty ((id) $1)
-        ((open-brace tyfields close-brace) (list 'record-type $2))
-        ((array of id) (list 'array-type $3)))
+        ((open-brace tyfields close-brace) (make-record-type $2))
+        ((array of id) (make-array-type $3)))
     
     (tyfields (() empty)
-              ((id colon id tyfields-comma) (cons (list $1 $3) $4)))
+              ((id colon id tyfields-comma) (cons (cons $1 $3) $4)))
     (tyfields-comma
      (() empty)
-     ((comma id colon id tyfields-comma) (cons (list $2 $4) $5)))
+     ((comma id colon id tyfields-comma) (cons (cons $2 $4) $5)))
          
     
     
     
     
     (expr ((val) $1)
-          ((expr +- expr) (prec plus) (list $2 $1 $3))
-          ((expr */ expr) (list $2 $1 $3))
-          ((expr and expr) (list 'and $1 $3))
-          ((expr or expr) (list 'or $1 $3))
-          ((expr comparison expr) (list $2 $1 $3))
-          ((expr equal expr) (list '= $1 $3))
+          ((expr +- expr) (prec plus) (make-arithmetic $2 $1 $3))
+          ((expr */ expr) (make-arithmetic $2 $1 $3))
+          ((expr and expr) (make-boolean 'and $1 $3))
+          ((expr or expr) (make-boolean 'or $1 $3))
+          ((expr comparison expr) (make-comparison $2 $1 $3))
+          ((expr equal expr) (make-comparison '= $1 $3))
 
-          ((lvalue assignment expr) (list ':= $1 $3))
-          ((expr open-paren close-paren) (list 'funcall $1 empty))
+          ((lvalue assignment expr) (make-assignment $1 $3))
+          ((expr open-paren close-paren) (make-function-call $1 empty))
           ((expr open-paren expr expr-comma-seq close-paren)
-           (list 'funcall $1 (cons $3 $4)))
-          ((minus expr) (list '- $2))
+           (make-function-call $1 (cons $3 $4)))
+          ((minus expr) (make-negation $2))
           ((array-creation) $1)
           ((record-creation) $1)
-          ((if expr then expr) (list 'if $2 $4))
-          ((if expr then expr else expr) (list 'if $2 $4 $6))
-          ((while expr do expr) (list 'while $2 $4))
-          ((for id assignment expr to expr do expr) (list 'for $2 $4 $6 $8))
-          ((let decs in expr-seq end) (list 'let $2 $4))
-          ((open-paren expr-seq close-paren) (list 'sequence $2))
+          ((if expr then expr) (make-if-then-else $2 $4 #f))
+          ((if expr then expr else expr) (make-if-then-else $2 $4 $6))
+          ((while expr do expr) (make-while-loop $2 $4))
+          ((for id assignment expr to expr do expr)
+           (make-for-loop $2 $4 $6 $8))
+          ((let decs in expr-seq end) (make-binder $2 (make-sequence $4)))
+          ((open-paren expr-seq close-paren) (make-sequence $2))
           )
     
     (record-creation
-     ((id open-brace close-brace) (list 'create-record $1 empty))
+     ((id open-brace close-brace)
+      (make-create-record $1 empty))
      ((id open-brace id-equal-expr id-equal-expr-comma-seq close-brace)
-      (list 'create-record $1 (cons $3 $4))))
+      (make-create-record $1 (cons $3 $4))))
     
-    (id-equal-expr ((id equal expr) (list $1 $3)))
+    (id-equal-expr ((id equal expr) (cons $1 $3)))
     (id-equal-expr-comma-seq
      (() empty)
      ((comma id-equal-expr id-equal-expr-comma-seq) (cons $2 $3)))
@@ -123,7 +128,7 @@
      
     (array-creation
      ((id open-bracket expr close-bracket of expr)
-      (list 'create-array $1 $3 $6)))
+      (make-create-array $1 $3 $6)))
      
      
     (+- ((plus) '+) ((minus) '-))
@@ -138,19 +143,21 @@
     (expr-semi-colon-seq (() empty)
                          ((semi-colon expr expr-semi-colon-seq) (cons $2 $3)))
     
-    (lvalue ((id lvalue2) (list 'lvalue $2 $1)))
+    (lvalue ((id lvalue2) ($2 (make-identifier $1))))
     
-    (lvalue2 (() empty)
-             ((open-bracket expr close-bracket lvalue2) (cons (list 'array-ref $2) $4))
-             ((period id lvalue2) (cons (list 'field-ref $2) $3)))
+    (lvalue2 (() (lambda (base) base))
+             ((open-bracket expr close-bracket lvalue2)
+              (lambda (base) ($4 (make-array-ref base $2))))
+             ((period id lvalue2)
+              (lambda (base) ($3 (make-field-ref base $2)))))
     
 
 
     (val ((lvalue) $1)
          ((literal) $1))
     (literal ((integer-literal) $1)
-             ((nil) 'nil))
-    (integer-literal ((integer) $1))
+             ((nil) (make-nil)))
+    (integer-literal ((integer) (make-integer-literal $1)))
     (id ((identifier) $1))
     
     
