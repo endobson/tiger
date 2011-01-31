@@ -1,8 +1,13 @@
-#lang racket
+#lang racket/base
 (require parser-tools/lex
+         racket/list
+         racket/contract
          parser-tools/yacc
          (prefix-in : parser-tools/lex-sre)
+         "core-ast.rkt"
          "source-ast.rkt")
+
+
 
 (define-tokens lang-tokens (integer identifier comparison */))
 (define-empty-tokens lang-empty-tokens
@@ -183,23 +188,11 @@
       (error 'parser "Got error: ~a ~a ~a" tok-ok? tok-name tok-value)))
    (end eof)))
 
+(define (parse p/s)
+ (let ((port (if (string? p/s) (open-input-string p/s) p/s)))
+  (lang-parser (lambda () (lang-lexer port)))))
 
 
-(define (parse str)
-  (let ((port (open-input-string str)))
-    (lang-parser (lambda () (lang-lexer port)))))
+(provide/contract
+ (parse (-> (or/c string? port?) expression?)))
 
-(parse "1*2+3/4")
-
-;(parse "1=2+3=4")
-;(parse "1=2=3=4")
-(parse "id:=id.z:=4")
-
-(parse "id:=id[4]:=4")
-(parse "--id")
-(parse "a & b|c    &d")
-(parse "a[x] of 2")
-(parse "a{e=3,b=6}")
-(parse "if a then if b then c else d")
-
-(parse "let type a = b in a[4] end")
