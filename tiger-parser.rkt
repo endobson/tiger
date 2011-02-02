@@ -80,7 +80,7 @@
           (make-function-type $2 $4 (make-unit-type) $7))
          ((function id open-paren tyfields close-paren colon id equal expr)
           (make-function-type $2 $4 $7 $9)))
-    (ty ((id) $1)
+    (ty ((id) (make-type-reference $1))
         ((open-brace tyfields close-brace) (make-record-type $2))
         ((array of id) (make-array-type $3)))
     
@@ -95,12 +95,12 @@
     
     
     (expr ((val) $1)
-          ((expr +- expr) (prec plus) (make-arithmetic $2 $1 $3))
-          ((expr */ expr) (make-arithmetic $2 $1 $3))
-          ((expr and expr) (make-boolean 'and $1 $3))
-          ((expr or expr) (make-boolean 'or $1 $3))
-          ((expr comparison expr) (make-comparison $2 $1 $3))
-          ((expr equal expr) (make-comparison '= $1 $3))
+          ((expr +- expr) (prec plus) (make-math $2 $1 $3))
+          ((expr */ expr) (make-math $2 $1 $3))
+          ((expr and expr) (make-math '& $1 $3))
+          ((expr or expr) (make-math '\| $1 $3))
+          ((expr comparison expr) (make-math $2 $1 $3))
+          ((expr equal expr) (make-math '= $1 $3))
 
           ((lvalue assignment expr) (make-assignment $1 $3))
           ((expr open-paren close-paren) (make-function-call $1 empty))

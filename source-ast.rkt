@@ -15,9 +15,7 @@
     Constant
     negation
     function-call
-    arithmetic
-    comparison
-    boolean
+    math
     create-record
     create-array
     while-loop
@@ -52,9 +50,7 @@
 (define-struct: function-call ((fun : expression) (args : (Listof expression))))
 
 (define-struct: negation ((expr : expression)))
-(define-struct: arithmetic ((operator : (U '+ '* '/ '-)) (left : expression) (right : expression)))
-(define-struct: comparison ((operator : (U '= '<> '< '> '<= '>=)) (left : expression) (right : expression)))
-(define-struct: boolean ((operator : (U 'and 'or)) (left : expression) (right : expression)))
+(define-struct: math ((operator : (U '+ '* '/ '- '= '<> '< '> '<= '>= '& '\| )) (left : expression) (right : expression)))
 
 (define-struct: create-record ((type : type) (fields : (Listof (Pair Symbol expression)))))
 (define-struct: create-array ((type : type) (size : expression) (value : expression)))
