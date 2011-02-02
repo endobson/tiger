@@ -3,7 +3,7 @@
 (require racket/match racket/list)
 
 (require "source-ast.rkt" "core-ast.rkt")
-(provide rename-variables  type-check)
+(provide rename-variables  type-check  break-check)
 
 
 
@@ -376,6 +376,58 @@
        (make-immutable-hash empty)))
      prog)))
   prog))
+
+
+
+
+(: break-check (expression -> Boolean))
+
+
+
+(define (break-check prog)
+ (define-type updater ((U expression declaration) -> Boolean))
+ (: check (Boolean -> updater))
+ (define (check valid)
+  (: recur updater)
+  (define (recur prog)
+   (match prog
+    ((identifier sym) #t)
+    ((field-ref base field) (recur base))
+    ((array-ref base index) (and (recur base) (recur index)))
+    ((binder declarations body)
+      (and (andmap recur declarations) (recur body)))
+    ((sequence exprs) (andmap recur exprs))
+    ((assignment value expr)
+     (and (recur value) (recur expr)))
+    ((if-then-else c t f)
+     (and (recur c) (recur t) (and f (recur f))))
+    ((integer-literal v) #t)
+    ((string-literal s) #t)
+    ((nil) #t)
+    ((negation expr) (recur expr))
+    ((function-call fun args)
+     (and (recur fun) (andmap recur args)))
+    ((math op left right)
+     (and (recur left) (recur right)))
+    ((create-record type fields)
+     (andmap recur (map (inst cdr Symbol expression) fields)))
+    ((create-array type size value)
+     (and (recur size) (recur value)))
+    ((while-loop guard body)
+     (and (recur guard) ((check #t) body)))
+    ((for-loop id init final body)
+     (and (recur init) (recur final) ((check #t) body)))
+    ((break) valid)
+    ((type-declaration name type) #t)
+    ((function-declaration name args return-type body)
+     ((check #f) body))
+    ((variable-declaration sym type value)
+     (recur value))
+    ((untyped-variable-declaration sym value)
+     (recur value))))
+       
+  recur)
+ ((check #f) prog))
 
 
 
