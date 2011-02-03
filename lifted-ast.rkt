@@ -4,10 +4,13 @@
 
 (provide (all-defined-out))
 
+(define-type type-environment (HashTable Symbol resolved-value-type))
+(define-type function-environment (HashTable Symbol lifted-function))
 
 
 (define-type expression
- (U binder
+ (U bind
+    bind-rec
     lvalue
     sequence
     assignment
@@ -19,16 +22,24 @@
     create-record
     create-array
     while-loop
-    for-loop
     break))
 
 
 (define-type lvalue (U identifier field-ref array-ref))
-(define-type declaration 
- (U type-declaration
-    function-declaration
-    untyped-variable-declaration
-    variable-declaration))
+
+
+
+(struct: lifted-program
+ ((types : type-environment)
+  (functions : function-environment)
+  (expr : expression)))
+
+(struct: lifted-function
+ ((type : function-type)
+  (args : (Listof Symbol))
+  (closed-variables : (Listof Symbol))
+  (closed-variable-types : (Listof value-type))
+  (body : expression)))
 
 
 
@@ -36,14 +47,17 @@
 (define-struct: field-ref ((base : lvalue) (field : Symbol)))
 (define-struct: array-ref ((base : lvalue) (index : expression)))
 
-(define-struct: binder ((declarations : (Listof declaration)) (body : expression)))
+(define-struct: bind ((symbol : Symbol) (value : expression) (body : expression)))
+(define-struct: bind-rec ((bindings : (Listof (Pair Symbol create-closure))) (body : expression)))
+
+(define-struct: create-closure ((function : Symbol) (closed-variables : (Listof Symbol))))
 
 (define-struct: sequence ((exprs : (Listof expression))))
 (define-struct: assignment ((value : lvalue)  (expr : expression)))
 (define-struct: if-then-else
                  ((cond : expression)
                   (true : expression)
-                  (false : (U #f expression))))
+                  (false : expression)))
 
 
 
@@ -56,17 +70,6 @@
 (define-struct: create-array ((type : type) (size : expression) (value : expression)))
 
 (define-struct: while-loop ((guard : expression) (body : expression)))
-(define-struct: for-loop ((id : Symbol) (init : expression) (final : expression) (body : expression)))
 (define-struct: break ())
-
-(define-struct: type-declaration ((name : Symbol) (type : value-type)))
-(define-struct: function-declaration ((name : Symbol) (args : (Listof (Pair Symbol value-type))) (return-type : type) (body : expression)))
-(define-struct: variable-declaration ((name : Symbol) (type : value-type) (value : expression)))
-(define-struct: untyped-variable-declaration ((name : Symbol) (value : expression)))
-
-
-
-
-(define-predicate expression? expression)
 
 

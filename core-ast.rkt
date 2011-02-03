@@ -9,7 +9,8 @@
 
 
 (define-type type (U value-type unit-type))
-(define-type value-type (U type-reference int-type string-type array-type record-type function-type))
+(define-type value-type (U type-reference resolved-value-type))
+(define-type resolved-value-type (U int-type string-type array-type record-type function-type))
 (define-type resolved-type (U Primitive-Type array-type record-type function-type))
 
 
