@@ -1,10 +1,9 @@
 #lang racket/base
 
 (require racket/file racket/system)
-(require "code-gen.rkt" (planet endobson/llvm/llvm))
+(require (planet endobson/llvm/llvm) "driver.rkt")
 
-
-(define program (compile-program #f))
+(provide run-program write-program)
 
 (define (run-program program)
  (define tmp-bitcode (make-temporary-file "llvm~a.bc"))
@@ -21,5 +20,7 @@
    (when (file-exists? tmp-executable)
     (delete-file tmp-executable)))))
 
-(run-program program)
+(define (write-program program path)
+ (LLVMWriteBitcodeToFile program path))
 
+ 

@@ -1,21 +1,13 @@
 #!/usr/bin/env racket
 #lang racket/base
 
-(require
- "tiger-parser.rkt"
- "semantic-checks.rkt"
- "lifter.rkt")
+(require "driver.rkt")
 
 
 (define source-path (vector-ref (current-command-line-arguments) 2))
+(define destination-path (vector-ref (current-command-line-arguments) 1))
 
-(define source-program
- (type-check
-  (rename-variables (parse (open-input-file source-path)) global-environment)
-  global-type-environment))
+(define program (full-compile source-path))
 
-(unless (break-check source-program)
- (eprintf "Exposed break~n")
- (exit 1))
-
+(write-program program destination-path)
 
