@@ -7,9 +7,11 @@
  "lifter.rkt")
 
 
+(define source-path (vector-ref (current-command-line-arguments) 2))
+
 (define source-program
  (type-check
-  (rename-variables (parse (current-input-port)) global-environment)
+  (rename-variables (parse (open-input-file source-path)) global-environment)
   global-type-environment))
 
 (unless (break-check source-program)
