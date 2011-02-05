@@ -1,7 +1,7 @@
 #!/usr/bin/env racket
 #lang racket/base
 
-(require "driver.rkt" "run-code-gen.rkt")
+(require "driver.rkt")
 
 
 (define source-path (vector-ref (current-command-line-arguments) 2))
