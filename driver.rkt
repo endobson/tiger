@@ -48,8 +48,8 @@
     (if (zero? (write-program program bitcode))
         (and
          (system* "/usr/bin/env" "llc" "-O2" "-o" (path->string assembly) (path->string bitcode))
-         (system* "/usr/bin/env" "as" "-o" (path->string object) (path->string assembly))
-         (system* "/usr/bin/env" "ld" "-lcrt1.o" "-lm" (path->string object) "-o" (path->string exe-path)))
+         (system* "/usr/bin/env" "as" "-arch" "i686" "-o" (path->string object) (path->string assembly))
+         (system* "/usr/bin/env" "clang" (path->string object) "-o" (path->string exe-path)))
         #f)))))
 
 
