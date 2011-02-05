@@ -1,8 +1,28 @@
 #lang racket/base
 
+(require (for-syntax racket/base))
+
 (require "tiger-parser.rkt" "semantic-checks.rkt" "lifter.rkt" "code-gen.rkt")
 
-(provide full-compile)
+(require racket/file racket/system)
+
+(provide full-compile compile-llvm)
+
+
+
+(define-syntax (with-temporary-file stx)
+ (syntax-case stx ()
+  ((_ id body bodies ...)
+   #'(let ((id (make-temporary-file)))
+      (dynamic-wind
+       (let ((first #t)) (lambda () (if first (set! first #f) (error 'run-program "Re-entering protected region"))))
+       (lambda () body bodies ...)
+       (lambda ()
+        (when (file-exists? id)
+         (delete-file id))))))))
+
+
+
 
 (define (check-semantics ast)
  (let ((ast (rename-variables ast global-environment)))
@@ -15,4 +35,23 @@
 
 (define (full-compile s/p)
  (compile-program (source-ast->lifted-ast (check-semantics (parse s/p)))))
+
+
+(define (compile-llvm program exe-path-string)
+ (define exe-path 
+  (cond
+   ((string? exe-path-string) (string->path exe-path-string))
+   ((path? exe-path-string) exe-path-string)))
+ (with-temporary-file bitcode
+  (with-temporary-file assembly
+   (with-temporary-file object
+    (if (zero? (write-program program bitcode))
+        (and
+         (system* "/usr/bin/env" "llc" "-O2" "-o" (path->string assembly) (path->string bitcode))
+         (system* "/usr/bin/env" "as" "-o" (path->string object) (path->string assembly))
+         (system* "/usr/bin/env" "ld" "-lcrt1.o" "-lm" (path->string object) "-o" (path->string exe-path)))
+        #f)))))
+
+
+
 

@@ -8,7 +8,10 @@
 (require racket/match racket/list)
 (require "lifted-ast.rkt" "core-ast.rkt")
 
-(provide compile-program)
+(provide compile-program write-program)
+
+
+
 
 (define (compile-program prog)
  (define context (LLVMContextCreate))
@@ -53,4 +56,9 @@
   (error 'compile-math "Not Yet implemented"))
 
  ((compile #f) expr))
+
+
+(define (write-program program path)
+ (LLVMWriteBitcodeToFile program path))
+
 
