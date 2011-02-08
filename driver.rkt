@@ -2,7 +2,7 @@
 
 (require (for-syntax racket/base))
 
-(require "tiger-parser.rkt" "semantic-checks.rkt" "lifter.rkt" "code-gen.rkt")
+(require "tiger-parser.rkt" "semantic-checks.rkt" "lifter.rkt" "code-gen.rkt" "type-checker.rkt" "environment.rkt")
 
 (require racket/file racket/system)
 
@@ -48,7 +48,12 @@
     (if (zero? (write-program program bitcode))
         (and
          (system* "/usr/bin/env" "llc" "-O2" "-o" (path->string assembly) (path->string bitcode))
-         (system* "/usr/bin/env" "as" "-arch" "i686" "-o" (path->string object) (path->string assembly))
+         (case (system-type 'os)
+          ((macosx)
+           (system* "/usr/bin/env" "as" "-arch" "i686" "-o" (path->string object) (path->string assembly)))
+          ((unix)
+           (system* "/usr/bin/env" "as" "-march" "i686" "-o" (path->string object) (path->string assembly)))
+          (else (error 'compile-llvm "Unknown System type")))
          (system* "/usr/bin/env" "clang" (path->string object) "-o" (path->string exe-path)))
         #f)))))
 

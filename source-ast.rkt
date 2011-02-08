@@ -68,5 +68,6 @@
 
 
 (define-predicate expression? expression)
+(define-predicate declaration? declaration)
 
 
