@@ -20,12 +20,12 @@
 
 (struct: environment
  ((ids : (HashTable Symbol Symbol))
-  (types : (HashTable Symbol Symbol))))
+  (types : (HashTable Symbol Symbol))) #:transparent)
 
 
 (struct: type-environment
  ((ids : (HashTable Symbol resolved-type))
-  (types : (HashTable Symbol resolved-value-type))))
+  (types : (HashTable Symbol resolved-value-type))) #:transparent)
 
 
 (: resolve-type
@@ -37,7 +37,7 @@
      (let ((sym (type-reference-name type)))
       (hash-ref (type-environment-types env) sym
        (lambda ()
-        (error 'resolve-type "Unbound type name ~a" sym))))
+        (error 'resolve-type "Unbound type name ~a in ~a" sym env))))
      type))
 
 

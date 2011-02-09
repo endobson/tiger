@@ -14,6 +14,18 @@
   (record-type-fields type)))
 
 
+(: record-field-type (record-type Symbol -> value-type))
+(define (record-field-type type sym)
+ (or
+  (ormap (lambda: ((field : (Pair Symbol value-type)))
+           (and (equal? sym (car field)) (cdr field)))
+   (record-type-fields type))
+  (error 'record-field-type "Record type ~a has no field of name ~a" type sym)))
+
+
+
+
+
 
 (: function-declaration->function-type (function-declaration -> function-type)) 
 (define (function-declaration->function-type dec)
@@ -63,7 +75,7 @@
     ((field-ref base field)
      (let-values (((base type) (recur base)))
       (if (and (record-type? type) (record-type-has-field? type field))
-          (values (field-ref base field) type)
+          (values (field-ref base field) (resolve-type (record-field-type type field) env))
           (error 'type-check "Expression ~a of type ~a has no field ~a" base type field))))
     ((array-ref base index)
      (let-values (((base a-type) (recur base)))
@@ -136,7 +148,23 @@
               (error 'type-check "The right expression of the math operation ~a, ~a had type ~a instead of int" op right r-type))
           (error 'type-check "The left expression of the math operation ~a, ~a had type ~a instead of int" op left l-type))))
     ((create-record type fields)
-     (error 'type-check "Not yet implemented create-record"))
+     (: check-field ((Pair Symbol value-type) (Pair Symbol expression) -> (Pair Symbol expression)))
+     (define (check-field type-pair expr-pair)
+      (let ((type-field-name (car type-pair))
+            (expr-field-name (car expr-pair))
+            (type-type (cdr type-pair))
+            (expr-expr (cdr expr-pair)))
+       (if (equal? type-field-name expr-field-name)
+           (let-values (((expr e-type) (recur expr-expr)))
+            (if (or (equal? 'nil e-type) (equal? e-type (resolve-type type-type env)))
+                (cons expr-field-name expr)
+                (error 'type-check "The field expression ~a has type ~a instead of ~a" expr e-type type-type)))
+           (error 'type-check "The field name is ~a and should be ~a" expr-field-name type-field-name))))
+
+     (let ((r-type (resolve-type type env)))
+      (match r-type
+       ((record-type ty-fields) 
+        (values (create-record type (map check-field ty-fields fields)) r-type)))))
     ((create-array type size value)
      (let-values (((size s-type) (recur size))
                   ((value v-type) (recur value))

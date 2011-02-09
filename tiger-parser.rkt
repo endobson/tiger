@@ -129,9 +129,9 @@
     
     (record-creation
      ((id open-brace close-brace)
-      (make-create-record $1 empty))
+      (make-create-record (make-type-reference $1) empty))
      ((id open-brace id-equal-expr id-equal-expr-comma-seq close-brace)
-      (make-create-record $1 (cons $3 $4))))
+      (make-create-record (make-type-reference $1) (cons $3 $4))))
     
     (id-equal-expr ((id equal expr) (cons $1 $3)))
     (id-equal-expr-comma-seq
