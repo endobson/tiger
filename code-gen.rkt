@@ -76,7 +76,10 @@
       (let* ((env (for/fold ((env global-environment)) ((arg-name arg-names) (i (in-naturals)))
                   (hash-set env arg-name (llvm-get-param (add1 i)))))
              (env (for/fold ((env env)) ((arg-name closed-names) (arg-type closed-types) (i (in-naturals)))
-                   (hash-set env arg-name (llvm-load (llvm-gep (llvm-get-param 0) 0 1 i))))))
+                   (hash-set env arg-name 
+                    (llvm-int-to-ptr
+                     (llvm-load (llvm-gep (llvm-get-param 0) 0 1 i))
+                     (convert-type arg-type info-env))))))
        (llvm-ret (compile-expr env info-env all-functions body)))))))
 
 
@@ -245,15 +248,10 @@
    (else (error 'compile "Math operator ~a not yet implemented" op))) l r))
 
  (define (compile-closure-call closure args)
-  
-  
-  (apply
-   llvm-call
-   (llvm-load (llvm-gep closure 0 0))
-   closure
-   args)
-
-  )
+   (apply llvm-call
+    (llvm-load (llvm-gep closure 0 0))
+    closure
+    args))
 
  (define (lookup-identifier id env)
   (hash-ref env id (lambda ()
