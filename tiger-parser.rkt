@@ -12,7 +12,7 @@
 (define-tokens lang-tokens (integer identifier comparison */))
 (define-empty-tokens lang-empty-tokens
   (eof for nil break period comma semi-colon colon
-   space plus minus and or
+   space plus minus and or arrow
    equal of if then else while do to let in end
    type array var function
    assignment open-paren close-paren open-bracket
@@ -22,11 +22,12 @@
 (define-lex-abbrev inter-space (:* whitespace))
 
 (define lang-lexer
-  (lexer
-   (whitespace (lang-lexer input-port))
+  (lexer-src-pos
+   (whitespace (return-without-pos (lang-lexer input-port)))
    ((:+ digit) (token-integer (string->number lexeme)))
+   ("->" (token-arrow))
    ("for" (token-for))
-   ("nil" (token-for))
+   ("nil" (token-nil))
    ("of" (token-of))
    ("if" (token-if))
    ("then" (token-then))
@@ -40,7 +41,7 @@
    ("type" (token-type))
    ("array" (token-array))
    ("var" (token-var))
-   ("function" (token-var))
+   ("function" (token-function))
    ("(" (token-open-paren))
    (")" (token-close-paren))
    ("[" (token-open-bracket))
@@ -75,21 +76,29 @@
          ((var id assignment expr)
           (make-untyped-variable-declaration $2 $4))
          ((var id colon id assignment expr)
-          (make-variable-declaration $2 $4 $6))
+          (make-variable-declaration $2 (make-type-reference $4) $6))
          ((function id open-paren tyfields close-paren equal expr)
-          (make-function-type $2 $4 (make-unit-type) $7))
+          (make-function-declaration $2 $4 (make-unit-type) $7))
          ((function id open-paren tyfields close-paren colon id equal expr)
-          (make-function-type $2 $4 $7 $9)))
+          (make-function-declaration $2 $4 (make-type-reference $7) $9)))
     (ty ((id) (make-type-reference $1))
+        ((open-paren ty-seq close-paren arrow ty) (make-function-type $2 $5))
+        ((ty arrow ty) (make-function-type (list $1) $3))
         ((open-brace tyfields close-brace) (make-record-type $2))
         ((array of id) (make-array-type $3)))
     
     (tyfields (() empty)
-              ((id colon id tyfields-comma) (cons (cons $1 $3) $4)))
+              ((id colon id tyfields-comma) (cons (cons $1 (make-type-reference $3)) $4)))
     (tyfields-comma
      (() empty)
-     ((comma id colon id tyfields-comma) (cons (cons $2 $4) $5)))
+     ((comma id colon id tyfields-comma) (cons (cons $2 (make-type-reference $4)) $5)))
          
+    (ty-seq (() empty)
+            ((ty ty-seq-comma) (cons $1 $2)))
+    (ty-seq-comma
+     (() empty)
+     ((comma ty ty-seq-comma) (cons $2 $3)))
+                  
     
     
     
@@ -104,7 +113,7 @@
 
           ((lvalue assignment expr) (make-assignment $1 $3))
           ((expr open-paren close-paren) (make-function-call $1 empty))
-          ((expr open-paren expr expr-comma-seq close-paren)
+          ((expr open-paren expr expr-comma-seq close-paren) 
            (make-function-call $1 (cons $3 $4)))
           ((minus expr) (make-negation $2))
           ((array-creation) $1)
@@ -171,25 +180,45 @@
           
     (nonassoc of open-brace close-brace
               open-bracket close-bracket
-              semi-colon open-paren
+              semi-colon 
               close-paren comma if then while do to for let in end)
     (left else)
+    (left open-paren)
     (right assignment)
     (left or)
     (left and)
     (nonassoc comparison equal)
     (left plus)
     (left */)
-    (nonassoc minus))
+    (nonassoc minus)
+    (right arrow)
+    )
    (tokens lang-tokens lang-empty-tokens)
    (start expr)
+   (src-pos)
    (error
-    (lambda (tok-ok? tok-name tok-value)
-      (error 'parser "Got error: ~a ~a ~a" tok-ok? tok-name tok-value)))
+    (lambda (tok-ok? tok-name tok-value start-pos end-pos)
+     (if tok-ok?
+      (error 'parser "Got unexpected token ~a(~a) at ~a:~a-~a:~a"
+       tok-name tok-value
+       (position-line start-pos)
+       (position-col  start-pos)
+       (position-line end-pos)
+       (position-col  end-pos))
+      (error 'parser "Bad Token at ~a:~a-~a:~a"
+       (position-line start-pos)
+       (position-col  start-pos)
+       (position-line end-pos)
+       (position-col  end-pos)))))
+      
+
+
+
    (end eof)))
 
 (define (parse p/s)
  (let ((port (if (string? p/s) (open-input-string p/s) p/s)))
+  (port-count-lines! port)
   (lang-parser (lambda () (lang-lexer port)))))
 
 

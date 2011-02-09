@@ -12,6 +12,8 @@
  type-environment-ids
  type-environment-types
 
+ resolve-type
+
  global-environment
  global-type-environment)
 
@@ -23,7 +25,20 @@
 
 (struct: type-environment
  ((ids : (HashTable Symbol resolved-type))
-  (types : (HashTable Symbol resolved-type))))
+  (types : (HashTable Symbol resolved-value-type))))
+
+
+(: resolve-type
+ (case-lambda
+  (value-type type-environment -> resolved-value-type)
+  (type type-environment -> resolved-type)))
+(define (resolve-type type env)
+ (if (type-reference? type)
+     (let ((sym (type-reference-name type)))
+      (hash-ref (type-environment-types env) sym
+       (lambda ()
+        (error 'resolve-type "Unbound type name ~a" sym))))
+     type))
 
 
 

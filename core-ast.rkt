@@ -14,8 +14,8 @@
 (define-type resolved-type (U Primitive-Type array-type record-type function-type))
 
 
-(define-struct: type-reference ((name : Symbol)))
-(define-struct: array-type ((elem-type : value-type)) #:transparent)
+(define-struct: type-reference ((name : Symbol)) #:transparent)
+(define-struct: array-type ((elem-type : value-type)))
 (define-struct: record-type ((fields : (Listof (Pair Symbol value-type)))))
 (define-struct: function-type ((args : (Listof value-type)) (return : type)) #:transparent)
 

@@ -204,9 +204,6 @@
 
 
  
-(: function-declaration->function-type (function-declaration -> function-type)) 
-(define (function-declaration->function-type dec)
- (error 'type-check "Not yet implemented"))
 
 (: span (All (a b) ((a -> Any : b) (Listof a) -> (values (Listof b) (Listof a)))))
 (define (span f list)
