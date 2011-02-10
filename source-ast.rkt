@@ -52,16 +52,20 @@
 (define-struct: negation ((expr : expression)))
 (define-struct: math ((operator : (U '+ '* '/ '- '= '<> '< '> '<= '>= '& '\| )) (left : expression) (right : expression)))
 
-(define-struct: create-record ((type : type) (fields : (Listof (Pair Symbol expression)))))
-(define-struct: create-array ((type : type) (size : expression) (value : expression)))
+(define-struct: create-record ((type : type-reference) (fields : (Listof (Pair Symbol expression)))))
+(define-struct: create-array ((type : type-reference) (size : expression) (value : expression)))
 
 (define-struct: while-loop ((guard : expression) (body : expression)))
 (define-struct: for-loop ((id : Symbol) (init : expression) (final : expression) (body : expression)))
 (define-struct: break ())
 
 (define-struct: type-declaration ((name : Symbol) (type : value-type)))
-(define-struct: function-declaration ((name : Symbol) (args : (Listof (Pair Symbol value-type))) (return-type : type) (body : expression)))
-(define-struct: variable-declaration ((name : Symbol) (type : value-type) (value : expression)))
+(define-struct: function-declaration
+ ((name : Symbol)
+  (args : (Listof (Pair Symbol type-reference)))
+  (return-type : (U type-reference unit-type))
+  (body : expression)))
+(define-struct: variable-declaration ((name : Symbol) (type : type-reference) (value : expression)))
 (define-struct: untyped-variable-declaration ((name : Symbol) (value : expression)))
 
 

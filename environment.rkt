@@ -60,22 +60,28 @@
   (make-immutable-hash
    '((int . int) (string . string)))))
 
+
+
 (: global-type-environment type-environment)
 (define global-type-environment
- (type-environment
-  (make-immutable-hash
-   (list
-    (cons 'print (function-type (list (string-type)) (unit-type)))
-    (cons 'flush (function-type empty  (unit-type)))
-    (cons 'getchar (function-type (list) (string-type)))
-    (cons 'ord (function-type (list (string-type)) (int-type)))
-    (cons 'chr (function-type (list (int-type)) (string-type)))
-    (cons 'size (function-type (list (string-type)) (int-type)))
-    (cons 'substring (function-type (list (string-type) (int-type) (int-type)) (string-type)))
-    (cons 'concat (function-type (list (string-type) (string-type)) (string-type)))
-    (cons 'not (function-type (list (int-type)) (int-type)))
-    (cons 'exit (function-type (list (int-type)) (unit-type)))))
-  (make-immutable-hash
-   (list
-    (cons 'int (int-type))
-    (cons 'string (string-type))))))
+ (let ((mtr (lambda: ((lst : (Listof Symbol))) (map type-reference lst)))
+       (unit (unit-type))
+       (string (type-reference 'string))
+       (int (type-reference 'int)))
+  (type-environment
+   (make-immutable-hash
+    (list
+     (cons 'print (function-type (mtr '(string)) unit))
+     (cons 'flush (function-type (mtr '())  unit))
+     (cons 'getchar (function-type (mtr '()) string))
+     (cons 'ord (function-type (mtr '(string)) int))
+     (cons 'chr (function-type (mtr '(int)) string))
+     (cons 'size (function-type (mtr '(string)) int))
+     (cons 'substring (function-type (mtr '(string int int)) string))
+     (cons 'concat (function-type (mtr '(string string)) string))
+     (cons 'not (function-type (mtr '(int)) int))
+     (cons 'exit (function-type (mtr '(int)) unit))))
+   (make-immutable-hash
+    (list
+     (cons 'int (int-type))
+     (cons 'string (string-type)))))))

@@ -15,9 +15,9 @@
 
 
 (define-struct: type-reference ((name : Symbol)) #:transparent)
-(define-struct: array-type ((elem-type : value-type)))
-(define-struct: record-type ((fields : (Listof (Pair Symbol value-type)))))
-(define-struct: function-type ((args : (Listof value-type)) (return : type)) #:transparent)
+(define-struct: array-type ((elem-type : type-reference)))
+(define-struct: record-type ((fields : (Listof (Pair Symbol type-reference)))))
+(define-struct: function-type ((args : (Listof type-reference)) (return : (U unit-type type-reference))) #:transparent)
 
 
 (define-struct: integer-literal ((value : Integer)))
@@ -31,4 +31,6 @@
 
 (define-type Primitive-Type (U int-type string-type unit-type))
 (define-predicate primitive-type? Primitive-Type)
+
+
 

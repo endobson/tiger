@@ -21,8 +21,10 @@
  (define-type updater
   (case-lambda
    (lvalue -> lvalue)
+   (unit-type -> unit-type)
+   (type-reference -> type-reference)
+   ((U unit-type type-reference) -> (U unit-type type-reference))
    (value-type -> value-type)
-   (type -> type)
    (expression -> expression)))
  (: rename (environment -> updater))
  (define (rename env)
@@ -64,13 +66,12 @@
     ((break) (break))
     ((int-type) (int-type))
     ((string-type) (string-type))
-    ((unit-type) (unit-type))
     ((array-type elem-type) (array-type (recur elem-type)))
     ((record-type fields)
      (record-type 
-      (map (inst cons Symbol value-type)
-       (map (inst car Symbol value-type) fields)
-       (map recur (map (inst cdr Symbol value-type) fields)))))
+      (map (inst cons Symbol type-reference)
+       (map (inst car Symbol type-reference) fields)
+       (map recur (map (inst cdr Symbol type-reference) fields)))))
     ((function-type args return)
      (function-type (map recur args) (recur return)))
     ((type-reference name)
@@ -162,14 +163,14 @@
      (map (lambda: ((dec : function-declaration))
       (match dec
        ((function-declaration name args type body)
-        (let ((arg-names (map (inst car Symbol value-type) args))
-              (arg-types (map (inst cdr Symbol value-type) args)))
+        (let ((arg-names (map (inst car Symbol type-reference) args))
+              (arg-types (map (inst cdr Symbol type-reference) args)))
          (let ((inner-env (add-identifiers arg-names env)))
           (let ((arg-names (map (lambda: ((name : Symbol)) (lookup-identifier name inner-env)) arg-names)))
            (let ((recur (rename inner-env)))
             (function-declaration 
              (lookup-identifier name env)
-             (map (inst cons Symbol value-type)
+             (map (inst cons Symbol type-reference)
                arg-names
                (map recur arg-types))
              (recur type)

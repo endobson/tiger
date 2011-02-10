@@ -31,7 +31,7 @@
 (define (function-declaration->function-type dec)
  (match dec
   ((function-declaration name args type body)
-   (function-type (map (inst cdr Symbol value-type) args) type))))
+   (function-type (map (inst cdr Symbol type-reference) args) type))))
 
 
 
@@ -262,7 +262,11 @@
             (if (unit-type? v-type)
                 (error 'type-check "Untyped variable declaration expression ~a has unit-type" value)
                 (let-values (((decs env) (extend-environment (rest decs) (add-identifier name v-type env))))
-                 (values (cons (variable-declaration name v-type value) decs) env))))))
+                 (let ((type-name (gensym 'untyped)))
+                  (values
+                   (list* (type-declaration type-name v-type)
+                          (variable-declaration name (type-reference type-name) value)
+                          decs) env)))))))
       ((type-declaration name type)
        (let-values (((type-decs decs) (span type-declaration? decs)))
         (let-values (((type-decs env) (check-type-declarations type-decs env)))

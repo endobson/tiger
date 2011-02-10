@@ -110,11 +110,17 @@
 (: source-ast->lifted-ast (source:expression -> lifted:lifted-program))
 (define (source-ast->lifted-ast expr)
  (define-type id-environment (HashTable Symbol value-type))
- (: lift (source:expression id-environment lift-environment -> (values lifted:expression lift-environment)))
+ (: lift
+  (case-lambda 
+   (source:lvalue id-environment lift-environment -> (values lifted:lvalue lift-environment))
+   (source:expression id-environment lift-environment -> (values lifted:expression lift-environment))))
  (define (lift expr id-env env)
   (match expr
    ((? constant? c) (values c env))
    ((source:identifier x) (values (lifted:identifier x) env))
+   ((source:field-ref base name)
+    (let-values (((base env) (lift base id-env env)))
+     (values (lifted:field-ref base name) env)))
    ((source:binder decls body)
     (cond
      ((empty? decls) (lift body id-env env))
@@ -136,7 +142,7 @@
                   (match dec
                    ((source:function-declaration name args type body)
                     (hash-set id-env name
-                     (function-type (map (inst cdr Symbol value-type) args) type))))) id-env fun-decs)))
+                     (function-type (map (inst cdr Symbol type-reference) args) type))))) id-env fun-decs)))
             (let-values (((inner-body env) (lift (source:binder other-decs body)
                                                  id-env env)))
              (let-values (((closures env)
@@ -147,8 +153,8 @@
                  (match dec
                   ((source:function-declaration name args type body)
                    (let* ((fun-name (gensym name))
-                          (arg-names (map (inst car Symbol value-type) args))
-                          (arg-types (map (inst cdr Symbol value-type) args))
+                          (arg-names (map (inst car Symbol type-reference) args))
+                          (arg-types (map (inst cdr Symbol type-reference) args))
                           (free-vars (remove-all arg-names (find-free-variables body))))
                     (let ((id-env (foldl (lambda: ((name : Symbol) (type : value-type) (env : id-environment)) (hash-set env name type)) id-env arg-names arg-types)))
                      (let-values (((body env) (lift body id-env env)))
@@ -168,6 +174,17 @@
    ((source:math op l r)
     (let*-values (((l env) (lift l id-env env)) ((r env) (lift r id-env env)))
      (values (lifted:math op l r) env)))
+   ((source:create-record type fields)
+    (let-values (((reversed-fields env)
+          (for/fold: : (values (Listof (Pair Symbol lifted:expression)) lift-environment)
+            ((lifted-fields : (Listof (Pair Symbol lifted:expression)) empty)
+             (env : lift-environment env))
+            ((field : (Pair Symbol source:expression) fields))
+           (let ((name (car field)) (expr (cdr field)))
+            (let-values (((l-expr env) (lift expr id-env env)))
+             (values (cons (cons name l-expr) lifted-fields) env))))))
+      (values (lifted:create-record type (reverse reversed-fields))
+              env)))
    ((source:function-call f args)
     (let*-values (((lf env) (lift f id-env env))
                   ((largs env)
