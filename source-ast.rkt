@@ -59,11 +59,11 @@
 (define-struct: for-loop ((id : Symbol) (init : expression) (final : expression) (body : expression)))
 (define-struct: break ())
 
-(define-struct: type-declaration ((name : Symbol) (type : value-type)))
+(define-struct: type-declaration ((name : Symbol) (type : (U type-reference compound-type))))
 (define-struct: function-declaration
  ((name : Symbol)
   (args : (Listof (Pair Symbol type-reference)))
-  (return-type : (U type-reference unit-type))
+  (return-type : (Option type-reference))
   (body : expression)))
 (define-struct: variable-declaration ((name : Symbol) (type : type-reference) (value : expression)))
 (define-struct: untyped-variable-declaration ((name : Symbol) (value : expression)))

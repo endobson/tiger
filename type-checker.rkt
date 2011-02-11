@@ -4,20 +4,83 @@
 (require "source-ast.rkt" "core-ast.rkt" "environment.rkt")
 
 
-(provide type-check)
+(provide type-check global-type-environment)
+
+
+(define-type type (U primitive-type compound-type))
+(define-type primitive-type (U int-type string-type unit-type))
+(define-type value-type (U string-type int-type compound-type))
+
+(define-struct: int-type () #:transparent)
+(define-struct: string-type () #:transparent)
+(define-struct: unit-type () #:transparent)
+
+
+
+(struct: type-environment
+ ((ids : (HashTable Symbol value-type))
+  (types : (HashTable Symbol value-type))) #:transparent)
+
+
+(: global-type-environment type-environment)
+(define global-type-environment
+ (let ((mtr (lambda: ((lst : (Listof Symbol))) (map type-reference lst)))
+       (string (type-reference 'string))
+       (int (type-reference 'int)))
+  (type-environment
+   (make-immutable-hash
+    (list
+     (cons 'print (function-type (mtr '(string)) #f))
+     (cons 'flush (function-type (mtr '())  #f))
+     (cons 'getchar (function-type (mtr '()) string))
+     (cons 'ord (function-type (mtr '(string)) int))
+     (cons 'chr (function-type (mtr '(int)) string))
+     (cons 'size (function-type (mtr '(string)) int))
+     (cons 'substring (function-type (mtr '(string int int)) string))
+     (cons 'concat (function-type (mtr '(string string)) string))
+     (cons 'not (function-type (mtr '(int)) int))
+     (cons 'exit (function-type (mtr '(int)) #f))))
+   (make-immutable-hash
+    (list
+     (cons 'int (int-type))
+     (cons 'string (string-type)))))))
+
+
+
+(: unresolve-type (value-type type-environment -> type-reference))
+(define (unresolve-type type type-env)
+ (let/ec: escape : type-reference
+  (hash-for-each (type-environment-types type-env)
+   (lambda: ((name : Symbol) (atype : value-type))
+    (when (equal? atype type) (escape (type-reference name)))))
+  (error 'unresolve-type "No name for type ~a in ~a" type type-env)))
+
+
+(: resolve-type (type-reference type-environment -> value-type))
+(define (resolve-type type env)
+ (if (type-reference? type)
+     (let ((sym (type-reference-name type)))
+      (hash-ref (type-environment-types env) sym
+       (lambda ()
+        (error 'resolve-type "Unbound type name ~a in ~a" sym env))))
+     type))
+
+
+
+
 
 
 (: record-type-has-field? (record-type Symbol -> Boolean))
 (define (record-type-has-field? type sym)
- (ormap (lambda: ((field : (Pair Symbol value-type)))
+ (ormap (lambda: ((field : (Pair Symbol type-reference)))
           (equal? sym (car field)))
   (record-type-fields type)))
 
 
-(: record-field-type (record-type Symbol -> value-type))
+(: record-field-type (record-type Symbol -> type-reference))
 (define (record-field-type type sym)
  (or
-  (ormap (lambda: ((field : (Pair Symbol value-type)))
+  (ormap (lambda: ((field : (Pair Symbol type-reference)))
            (and (equal? sym (car field)) (cdr field)))
    (record-type-fields type))
   (error 'record-field-type "Record type ~a has no field of name ~a" type sym)))
@@ -58,10 +121,10 @@
 
 (: type-check (expression type-environment -> expression))
 (define (type-check prog env)
- (define-type pos-type (U 'nil resolved-type))
+ (define-type pos-type (U 'nil type))
  (define-type updater
   (case-lambda
-   (lvalue -> (values lvalue resolved-type))
+   (lvalue -> (values lvalue type))
    (expression -> (values expression pos-type))))
 
 
@@ -136,13 +199,17 @@
           (error 'type-check "The expression of a negation ~a had type ~a instead of int" expr type))))
     ((function-call fun args)
      (let-values (((fun fun-type) (recur fun)) ((args arg-types) (map2 recur args)))
-      (if (function-type? fun-type)
-       (if (equal? (map (resolve-type* env) (function-type-args fun-type))
-                   arg-types)
-           (values (function-call fun args) (resolve-type (function-type-return fun-type) env))
-           (error 'type-check "Arguments ~a of types ~a did not match function argument types of ~a"
-             args arg-types fun-type))
-       (error 'type-check "Function expression ~a of type ~a is not of a function type" fun fun-type))))
+      (match fun-type
+       ((function-type fun-arg-types fun-return-type)
+         (if (equal? (map (resolve-type* env) fun-arg-types)
+                     arg-types)
+             (values (function-call fun args)
+                     (if fun-return-type
+                         (resolve-type fun-return-type env)
+                         (unit-type)))
+             (error 'type-check "Arguments ~a of types ~a did not match function argument types of ~a"
+               args arg-types fun-type)))
+       (else (error 'type-check "Function expression ~a of type ~a is not of a function type" fun fun-type)))))
     ((math op left right)
      (let-values (((left  l-type) (recur left))
                   ((right r-type) (recur right)))
@@ -152,7 +219,7 @@
               (error 'type-check "The right expression of the math operation ~a, ~a had type ~a instead of int" op right r-type))
           (error 'type-check "The left expression of the math operation ~a, ~a had type ~a instead of int" op left l-type))))
     ((create-record type fields)
-     (: check-field ((Pair Symbol value-type) (Pair Symbol expression) -> (Pair Symbol expression)))
+     (: check-field ((Pair Symbol type-reference) (Pair Symbol expression) -> (Pair Symbol expression)))
      (define (check-field type-pair expr-pair)
       (let ((type-field-name (car type-pair))
             (expr-field-name (car expr-pair))
@@ -209,36 +276,36 @@
   recur)
   
  
- (: lookup-identifier-type (Symbol type-environment -> resolved-type))
+ (: lookup-identifier-type (Symbol type-environment -> value-type))
  (define (lookup-identifier-type sym env)
   (hash-ref (type-environment-ids env) sym
    (lambda ()
     (error 'lookup-identifier "Unbound Identifier ~a" sym))))
 
- (: resolve-type* (type-environment -> (type -> resolved-type)))
+ (: resolve-type* (type-environment -> (type-reference -> value-type)))
  (define (resolve-type* env)
-  (lambda: ((t : type)) (resolve-type t env)))
+  (lambda: ((t : type-reference)) (resolve-type t env)))
 
- (: add-identifier (Symbol type type-environment -> type-environment))
+ (: add-identifier (Symbol value-type type-environment -> type-environment))
  (define (add-identifier sym type env)
   (match env
    ((type-environment ids types)
-    (type-environment (hash-set ids sym (resolve-type type env)) types ))))
+    (type-environment (hash-set ids sym type) types ))))
 
 
  (: add-type (Symbol value-type type-environment -> type-environment))
  (define (add-type sym type env)
   (match env
    ((type-environment ids types)
-    (type-environment ids (hash-set types sym (resolve-type type env))))))
+    (type-environment ids (hash-set types sym type)))))
 
 
 
- (: add-identifiers ((Listof (Pair Symbol type)) type-environment -> type-environment))
+ (: add-identifiers ((Listof (Pair Symbol value-type)) type-environment -> type-environment))
  (define (add-identifiers syms env)
   (for/fold: : type-environment
    ((env : type-environment env))
-   ((sym : (Pair Symbol type) syms))
+   ((sym : (Pair Symbol value-type) syms))
    (add-identifier (car sym) (cdr sym) env)))
 
  (: extend-environment ((Listof declaration) type-environment -> (values (Listof declaration) type-environment)))
@@ -255,10 +322,11 @@
           (values (append fun-decs decs) env)))))
       ((variable-declaration name type value)
        (let-values (((value v-type) ((rename env) value)))
-        (if (equal? (resolve-type type env) v-type)
-            (let-values (((decs env) (extend-environment (rest decs) (add-identifier name type env))))
+        (let ((r-type (resolve-type type env)))
+        (if (equal? r-type v-type)
+            (let-values (((decs env) (extend-environment (rest decs) (add-identifier name r-type env))))
              (values (cons (variable-declaration name type value) decs) env))
-            (error 'type-check "Variable declaration type ~a does not match type of expression ~a" type v-type))))
+            (error 'type-check "Variable declaration type ~a does not match type of expression ~a" type v-type)))))
       ((untyped-variable-declaration name value)
        (let-values (((value v-type) ((rename env) value)))
         (if (equal? 'nil v-type)
@@ -266,11 +334,7 @@
             (if (unit-type? v-type)
                 (error 'type-check "Untyped variable declaration expression ~a has unit-type" value)
                 (let-values (((decs env) (extend-environment (rest decs) (add-identifier name v-type env))))
-                 (let ((type-name (gensym 'untyped)))
-                  (values
-                   (list* (type-declaration type-name v-type)
-                          (variable-declaration name (type-reference type-name) value)
-                          decs) env)))))))
+                 (values (cons (variable-declaration name (unresolve-type v-type env) value) decs) env))))))
       ((type-declaration name type)
        (let-values (((type-decs decs) (span type-declaration? decs)))
         (let-values (((type-decs env) (check-type-declarations type-decs env)))
@@ -282,17 +346,19 @@
  (: check-function-declarations ((Listof function-declaration) type-environment -> (values (Listof function-declaration) type-environment)))
  (define (check-function-declarations decs env)
   (let ((env (add-identifiers
-         (map (inst cons Symbol type)
+         (map (inst cons Symbol value-type)
               (map function-declaration-name decs)
               (map function-declaration->function-type decs)) env)))
     (: fix-function-declaration (function-declaration -> function-declaration))
     (define (fix-function-declaration dec)
      (match dec
       ((function-declaration name args type body)
-       (let-values (((body b-type) ((rename (add-identifiers args env)) body)))
-        (if (equal? b-type (resolve-type type env))
-            (function-declaration name args type body)
-            (error 'type-check "Bad function declaration body, should have type ~a has type ~a" type b-type))))))
+       (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
+        (let-values (((body b-type) ((rename (add-identifiers args-typed env)) body)))
+         (if (if type (equal? b-type (resolve-type type env))
+                 (unit-type? b-type))
+             (function-declaration name args type body)
+             (error 'type-check "Bad function declaration body, should have type ~a has type ~a" type b-type)))))))
 
     (values (map fix-function-declaration decs) env)))
 
@@ -352,13 +418,8 @@
   (define (extend dec env)
    (match dec
     ((type-declaration name type)
-     (add-type name (resolve-type type env) env))))
+     (add-type name (if (type-reference? type) (resolve-type type env) type) env))))
 
-  (: normalize (type-environment -> (type-declaration -> type-declaration)))
-  (define ((normalize env) dec)
-   (match dec
-    ((type-declaration name ty)
-     (type-declaration name (resolve-type ty env)))))
    
 
   (: reference-dag dag)
@@ -379,8 +440,7 @@
    (error 'type-check "Cycle in type declarations ~a" types))
   (define ordered (reverse (make-ordered reference-dag types (make-table types))))
   (define final-env (foldl extend env ordered))
-  (define fixed-decls (map (normalize final-env) ordered))
-  (values fixed-decls final-env))
+  (values ordered final-env))
 
 
 

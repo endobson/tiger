@@ -112,7 +112,7 @@
 
 (define-struct: proto-function-type 
  ((arg-types : (Listof proto-ref-type))
-  (return-type : proto-ref-type)) #:transparent)
+  (return-type : (Option proto-ref-type))) #:transparent)
 
 
 (define-struct: proto-record-type 
@@ -153,11 +153,14 @@
          (function-type? type))
     (set-function-type-arg-types! type
      (lookup-types (proto-function-type-arg-types proto) env))
-    (set-function-type-return-type! type
-     (lookup-type (proto-function-type-return-type proto) env)))
+    (let ((return-type (proto-function-type-return-type proto)))
+     (set-function-type-return-type! type
+       (if return-type
+           (lookup-type return-type env)
+            unit-type*))))
 
-   ((and (proto-function-type? proto)
-         (function-type? type))
+   ((and (proto-record-type? proto)
+         (record-type? type))
     (set-record-type-fields! type
      (lookup-fields (proto-record-type-fields proto) env)))
 

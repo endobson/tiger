@@ -78,7 +78,7 @@
          ((var id colon id assignment expr)
           (make-variable-declaration $2 (make-type-reference $4) $6))
          ((function id open-paren tyfields close-paren equal expr)
-          (make-function-declaration $2 $4 (make-unit-type) $7))
+          (make-function-declaration $2 $4 #f $7))
          ((function id open-paren tyfields close-paren colon id equal expr)
           (make-function-declaration $2 $4 (make-type-reference $7) $9)))
     (ty ((id) (make-type-reference $1))
@@ -161,9 +161,9 @@
     
     (lvalue2 (() (lambda (base) base))
              ((open-bracket expr close-bracket lvalue2)
-              (lambda (base) ($4 (make-array-ref base $2))))
+              (lambda (base) ($4 (make-array-ref base $2 #f))))
              ((period id lvalue2)
-              (lambda (base) ($3 (make-field-ref base $2)))))
+              (lambda (base) ($3 (make-field-ref base $2 #f)))))
     
 
 

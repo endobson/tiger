@@ -21,10 +21,9 @@
  (define-type updater
   (case-lambda
    (lvalue -> lvalue)
-   (unit-type -> unit-type)
    (type-reference -> type-reference)
-   ((U unit-type type-reference) -> (U unit-type type-reference))
-   (value-type -> value-type)
+   (compound-type -> compound-type)
+   ((U type-reference compound-type) -> (U type-reference compound-type))
    (expression -> expression)))
  (: rename (environment -> updater))
  (define (rename env)
@@ -64,8 +63,6 @@
             (recur (rename env)))
       (for-loop (lookup-identifier id env) (recur init) (recur final) (recur body))))
     ((break) (break))
-    ((int-type) (int-type))
-    ((string-type) (string-type))
     ((array-type elem-type) (array-type (recur elem-type)))
     ((record-type fields)
      (record-type 
@@ -73,7 +70,7 @@
        (map (inst car Symbol type-reference) fields)
        (map recur (map (inst cdr Symbol type-reference) fields)))))
     ((function-type args return)
-     (function-type (map recur args) (recur return)))
+     (function-type (map recur args) (and return (recur return))))
     ((type-reference name)
      (type-reference (lookup-type name env)))
     ))
@@ -173,7 +170,7 @@
              (map (inst cons Symbol type-reference)
                arg-names
                (map recur arg-types))
-             (recur type)
+             (and type (recur type))
              (recur body))))))))) decs)
      env))))
 

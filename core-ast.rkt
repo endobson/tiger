@@ -3,21 +3,15 @@
 (provide (all-defined-out))
 
 
-(define-struct: int-type () #:transparent)
-(define-struct: string-type () #:transparent)
-(define-struct: unit-type () #:transparent)
 
 
-(define-type type (U value-type unit-type))
-(define-type value-type (U type-reference resolved-value-type))
-(define-type resolved-value-type (U int-type string-type array-type record-type function-type))
-(define-type resolved-type (U Primitive-Type array-type record-type function-type))
+(define-type compound-type (U array-type record-type function-type))
 
 
 (define-struct: type-reference ((name : Symbol)) #:transparent)
 (define-struct: array-type ((elem-type : type-reference)))
 (define-struct: record-type ((fields : (Listof (Pair Symbol type-reference)))))
-(define-struct: function-type ((args : (Listof type-reference)) (return : (U unit-type type-reference))) #:transparent)
+(define-struct: function-type ((args : (Listof type-reference)) (return : (Option type-reference))) #:transparent)
 
 
 (define-struct: integer-literal ((value : Integer)))
@@ -27,10 +21,6 @@
 (define-type Constant (U integer-literal string-literal nil))
 (define-predicate constant? Constant)
 
-
-
-(define-type Primitive-Type (U int-type string-type unit-type))
-(define-predicate primitive-type? Primitive-Type)
 
 
 

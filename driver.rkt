@@ -2,13 +2,15 @@
 
 (require (for-syntax racket/base))
 
-(require "tiger-parser.rkt" "semantic-checks.rkt" "lifter.rkt" "code-gen.rkt" "type-checker.rkt" "environment.rkt")
+(require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt")
+
+;(require "lifter.rkt" "code-gen.rkt")
 
 (require (prefix-in source->inter: "source-intermediate-transform.rkt"))
 
 (require racket/file racket/system)
 
-(provide full-compile compile-llvm)
+(provide full-compile #;compile-llvm)
 
 
 
@@ -41,9 +43,10 @@
    checked-program
    source->inter:global-env
    source->inter:global-type-env)
+#;
   (compile-program (source-ast->lifted-ast checked-program))))
 
-
+#;
 (define (compile-llvm program exe-path-string)
  (define exe-path 
   (cond

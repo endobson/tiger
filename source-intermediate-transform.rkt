@@ -53,7 +53,10 @@
    (match prog
     ((source:identifier name) 
      (if (hash-has-key? env name) (inter:identifier name) 
-      (inter:primop-expr (hash-ref global-env name (lambda () (error 'transform "Unbound identifier ~a" name))) empty)))
+      (inter:primop-expr
+       (hash-ref global-env name
+        (lambda () (error 'transform "Unbound identifier ~a in ~a and ~a" name env global-env)))
+       empty)))
     ((source:math symbol left right)
      (inter:primop-expr (math-primop symbol) (list (recur left) (recur right))))
     ((source:negation expr)
@@ -122,7 +125,8 @@
        (match (first decls)
         ((source:untyped-variable-declaration var body) (error "Untyped variable declaration remains"))
         ((source:variable-declaration var type body)
-         (inter:bind var (lookup-type-reference type type-env) (recur body) (recur (source:binder (rest decls) expr))))
+         (inter:bind var (lookup-type-reference type type-env) (recur body)
+          ((trans (hash-set env var #t) type-env)  (source:binder (rest decls) expr))))
         ((source:function-declaration name args type body)
          (let-values (((fun-decls decls) (span source:function-declaration? decls)))
           (let-values (((funs env) (transform-function-declarations fun-decls env type-env)))
@@ -149,7 +153,7 @@
  (: lookup-type (Symbol (HashTable Symbol inter:type) -> inter:type))
  (define (lookup-type name env)
   (hash-ref env name
-   (error 'transform "Unbound type referenece ~a" name)))
+   (lambda () (error 'transform "Unbound type referenece ~a in ~a" name env))))
  
  (: transform-function-declarations
   ((Listof source:function-declaration) (HashTable Symbol #t) (HashTable Symbol inter:type) ->
@@ -168,7 +172,7 @@
             (arg-types (map (inst cdr Symbol source:type-reference) args)))
        (let ((env (foldl add-symbol env arg-names)))
         (let ((body ((trans env type-env) body))
-              (return (if (source:unit-type? return) inter:unit-type (lookup-type-reference return type-env)))
+              (return (if return (lookup-type-reference return type-env) inter:unit-type))
               (arg-types (map (lambda: ((ref : source:type-reference)) (lookup-type-reference ref type-env)) arg-types)))
          (cons name (inter:function (map (inst cons Symbol inter:type) arg-names arg-types) return body))))))))
    (values (map transform-function-declaration fun-decs) env)))
@@ -182,7 +186,11 @@
    (match dec
     ((source:type-declaration name ty)
      (cons name (convert-type ty)))))
-  (: convert-type (source:type -> (U inter:proto-type inter:proto-ref-type)))
+  (: convert-type (case-lambda
+                   (source:compound-type  ->  inter:proto-type)
+                   (source:type-reference -> inter:proto-ref-type)
+                   ((U source:compound-type source:type-reference) -> (U inter:proto-type inter:proto-ref-type))))
+
   (define (convert-type ty)
    (match ty
     ((source:type-reference name) name)
@@ -191,8 +199,11 @@
       (map
        (lambda: ((pair : (Pair Symbol source:type-reference))) (cons (car pair) (source:type-reference-name (cdr pair))))
        fields)))
-    ((source:array-type (source:type-reference name)) (inter:proto-array-type name))
-    (else (error 'transform "unsuported-type ~a" ty))))
+    ((source:array-type ref) (inter:proto-array-type (source:type-reference-name ref)))
+    ((source:function-type arg-types return-type)
+     (inter:proto-function-type
+      (map source:type-reference-name arg-types)
+      (and return-type (source:type-reference-name return-type))))))
 
   (inter:fix-proto-types (map convert-type-declaration type-decs) type-env))
 
