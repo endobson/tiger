@@ -12,6 +12,7 @@
  type-environment-ids
  type-environment-types
 
+ unresolve-type
  resolve-type
 
  global-environment
@@ -26,6 +27,16 @@
 (struct: type-environment
  ((ids : (HashTable Symbol resolved-type))
   (types : (HashTable Symbol resolved-value-type))) #:transparent)
+
+
+(: unresolve-type
+ (resolved-type type-environment -> type-reference))
+(define (unresolve-type type type-env)
+ (let/ec: escape : type-reference
+  (hash-for-each (type-environment-types type-env)
+   (lambda: ((name : Symbol) (atype : resolved-value-type))
+    (when (equal? atype type) (escape (type-reference name)))))
+  (error 'unresolve-type "No name for type ~a in ~a" type type-env)))
 
 
 (: resolve-type

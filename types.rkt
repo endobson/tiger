@@ -3,7 +3,9 @@
 
 (provide
  type
+ compound-type
  proto-type
+ proto-ref-type
 
  type?
  proto-type?
@@ -14,6 +16,8 @@
  (struct-out proto-array-type)
  (struct-out proto-box-type)
 
+ fix-proto-types
+
  unit-type?
  int-type?
  string-type?
@@ -23,6 +27,14 @@
   (int-type* int-type)
   (string-type* string-type))
 
+
+
+ (rename-out
+  (f-type function-type)
+  (a-type array-type)
+  (r-type record-type)
+  (b-type box-type))
+
  function-type?
  record-type?
  array-type?
@@ -31,6 +43,7 @@
 
  record-type-has-field?
  record-type-field-type
+ make-function-type
  (rename-out
   (function-type-return-type* function-type-return-type)
   (function-type-arg-types function-type-arg-types)
@@ -62,6 +75,10 @@
 
 
 
+(define-type f-type function-type)
+(define-type r-type record-type)
+(define-type a-type array-type)
+(define-type b-type box-type)
 
 
 (struct: function-type 
@@ -84,7 +101,7 @@
 
 (define-type proto-ref-type Symbol)
 
-(define-type proto-type (U proto-compound-type primitive-type)) 
+(define-type proto-type proto-compound-type) 
 (define-type proto-compound-type
  (U proto-function-type
     proto-record-type
@@ -93,26 +110,30 @@
 
 
 
-(struct: proto-function-type 
+(define-struct: proto-function-type 
  ((arg-types : (Listof proto-ref-type))
   (return-type : proto-ref-type)) #:transparent)
 
 
-(struct: proto-record-type 
+(define-struct: proto-record-type 
  ((fields : (Listof (Pair Symbol proto-ref-type)))) #:transparent)
 
-(struct: proto-array-type 
- ((unique : Symbol)
-  (elem-type : proto-ref-type)) #:transparent)
+(define-struct: proto-array-type 
+ ((elem-type : proto-ref-type)) #:transparent)
 
-(struct: proto-box-type ((elem-type : proto-ref-type)) #:transparent)
+(define-struct: proto-box-type ((elem-type : proto-ref-type)) #:transparent)
 
 (define-predicate primitive-type? primitive-type)
 (define-predicate type? type)
 (define-predicate proto-type? proto-type)
+(define-predicate proto-ref-type? proto-ref-type)
 
 
-(: fix-proto-types ((Listof (Pair Symbol proto-type)) (HashTable Symbol type) -> (HashTable Symbol type)))
+
+(define-predicate proto-pair? (Pair Symbol proto-type))
+(define-predicate proto-ref-pair? (Pair Symbol proto-ref-type))
+
+(: fix-proto-types ((Listof (Pair Symbol (U proto-type proto-ref-type))) (HashTable Symbol type) -> (HashTable Symbol type)))
 
 
 (define (fix-proto-types sym-types env) 
@@ -123,8 +144,7 @@
    ((proto-function-type? type) (function-type #f #f))
    ((proto-record-type? type)   (record-type (gensym 'id) #f))
    ((proto-array-type? type)    (array-type (gensym 'id) #f))
-   ((proto-box-type? type)      (box-type #f))
-   (else type)))
+   ((proto-box-type? type)      (box-type #f))))
 
  (: fix-type ((HashTable Symbol type) -> (proto-type type -> Void)))
  (define ((fix-type env) proto type)
@@ -154,8 +174,6 @@
      (lookup-type (proto-box-type-elem-type proto) env)))
 
 
-   ((and (primitive-type? proto)
-         (primitive-type? type)) (void))
    (else (error 'fix-type "Bad pair ~a and ~a" proto type))))
 
 
@@ -187,10 +205,18 @@
  (: add-type (Symbol type (HashTable Symbol type) -> (HashTable Symbol type)))
  (define (add-type sym type env) (hash-set env sym type))
 
- (let* ((syms (map (inst car Symbol proto-type) sym-types))
-        (proto-types (map (inst cdr Symbol proto-type) sym-types))
+ (: add-alias ((Pair Symbol proto-ref-type) (HashTable Symbol type) -> (HashTable Symbol type)))
+ (define (add-alias pair env)
+  (hash-set env (car pair) (lookup-type (cdr pair) env)))
+
+
+ (let* ((sym-proto-types (filter proto-pair? sym-types))
+        (sym-proto-ref-types (filter proto-ref-pair? sym-types))
+        (syms (map (inst car Symbol proto-type) sym-proto-types))
+        (proto-types (map (inst cdr Symbol proto-type) sym-proto-types))
         (types (map convert-proto proto-types))
-        (env (foldl add-type env syms types)))
+        (env (foldl add-type env syms types))
+        (env (foldl add-alias env sym-proto-ref-types)))
   (map (fix-type env) proto-types types)
   env))
         
@@ -241,5 +267,8 @@
   (error 'box-type-elem-type "Uninitialized type")))
 
 
+(: make-function-type ((Listof type) type -> function-type))
+(define make-function-type function-type)
+ 
 
 

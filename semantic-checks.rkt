@@ -32,8 +32,8 @@
   (define (recur prog)
    (match prog
     ((identifier sym) (identifier (lookup-identifier sym env)))
-    ((field-ref base field) (field-ref (recur base) field))
-    ((array-ref base index) (array-ref (recur base) (recur index)))
+    ((field-ref base field ty) (field-ref (recur base) field (and ty (recur ty))))
+    ((array-ref base index ty) (array-ref (recur base) (recur index) (and ty (recur ty))))
     ((binder declarations body)
      (let-values (((declarations env) (extend-environment declarations env)))
       (binder declarations ((rename env) body))))
@@ -242,8 +242,8 @@
   (define (recur prog)
    (match prog
     ((identifier sym) #t)
-    ((field-ref base field) (recur base))
-    ((array-ref base index) (and (recur base) (recur index)))
+    ((field-ref base field ty) (recur base))
+    ((array-ref base index ty) (and (recur base) (recur index)))
     ((binder declarations body)
       (and (andmap recur declarations) (recur body)))
     ((sequence exprs) (andmap recur exprs))

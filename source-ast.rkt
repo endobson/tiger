@@ -33,8 +33,8 @@
 
 
 (define-struct: identifier ((symbol : Symbol)))
-(define-struct: field-ref ((base : lvalue) (field : Symbol)))
-(define-struct: array-ref ((base : lvalue) (index : expression)))
+(define-struct: field-ref ((base : lvalue) (field : Symbol) (type : (Option type-reference))))
+(define-struct: array-ref ((base : lvalue) (index : expression) (type : (Option type-reference))))
 
 (define-struct: binder ((declarations : (Listof declaration)) (body : expression)))
 

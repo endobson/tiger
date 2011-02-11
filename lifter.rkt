@@ -52,8 +52,8 @@
  (define (recur prog)
   (match prog
    ((source:identifier sym) (list sym))
-   ((source:field-ref base field) (recur base))
-   ((source:array-ref base index) (append (recur base) (recur index)))
+   ((source:field-ref base field ty) (recur base))
+   ((source:array-ref base index ty) (append (recur base) (recur index)))
    ((source:binder declarations body)
      (remove-declarations declarations (append  (recur body) (append-map recur declarations))))
    ((source:sequence exprs) (append-map recur exprs))
@@ -118,7 +118,7 @@
   (match expr
    ((? constant? c) (values c env))
    ((source:identifier x) (values (lifted:identifier x) env))
-   ((source:field-ref base name)
+   ((source:field-ref base name ty)
     (let-values (((base env) (lift base id-env env)))
      (values (lifted:field-ref base name) env)))
    ((source:binder decls body)

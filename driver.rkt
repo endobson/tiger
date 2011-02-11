@@ -4,6 +4,8 @@
 
 (require "tiger-parser.rkt" "semantic-checks.rkt" "lifter.rkt" "code-gen.rkt" "type-checker.rkt" "environment.rkt")
 
+(require (prefix-in source->inter: "source-intermediate-transform.rkt"))
+
 (require racket/file racket/system)
 
 (provide full-compile compile-llvm)
@@ -34,7 +36,12 @@
 
 
 (define (full-compile s/p)
- (compile-program (source-ast->lifted-ast (check-semantics (parse s/p)))))
+ (let ((checked-program (check-semantics (parse s/p))))
+  (source->inter:transform 
+   checked-program
+   source->inter:global-env
+   source->inter:global-type-env)
+  (compile-program (source-ast->lifted-ast checked-program))))
 
 
 (define (compile-llvm program exe-path-string)
