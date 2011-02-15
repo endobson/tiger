@@ -9,7 +9,6 @@
 
 (define program (full-compile (open-input-file source-path)))
 
-#;
 (unless (compile-llvm program destination-path)
  (exit 1))
 

@@ -7,7 +7,8 @@
 
 (require racket/match racket/list unstable/hash)
 (require "lifted-ast.rkt"
- (except-in "core-ast.rkt" make-function-type))
+         "types.rkt" 
+         "primop.rkt")
 
 (provide compile-program write-program)
 
@@ -52,19 +53,18 @@
     #f))
 
   (define function-descriptions (lifted-program-functions prog))
-  (define type-environment (hash-set (lifted-program-types prog) 'int (make-int-type)))
   (define all-functions 
    (for/hash (((name fun-desc) function-descriptions))
     (values name
      (llvm-add-function
-      (make-function-type (lifted-function-type fun-desc) type-environment)
+      (convert-function-type (lifted-function-type fun-desc))
       (symbol->string name)))))
 
      
-  (define info-env (hash-union function-descriptions type-environment))
+  (define info-env (hash-union function-descriptions))
   (define global-environment
    (hash-union
-    (hash 'exit exit-closure)))
+    (hash (make-runtime-primop (make-function-type (list int-type) unit-type) 'exit) exit-closure)))
 
 
   (for (((name fun-desc) function-descriptions))
@@ -79,7 +79,7 @@
                    (hash-set env arg-name 
                     (llvm-int-to-ptr
                      (llvm-load (llvm-gep (llvm-get-param 0) 0 1 i))
-                     (convert-type arg-type info-env))))))
+                     (convert-type arg-type))))))
        (llvm-ret (compile-expr env info-env all-functions body)))))))
 
 
@@ -100,24 +100,21 @@
  module)
 
 
-(define (convert-type type env)
- (match type
-  ((int-type) (llvm-int-type))
-  ((unit-type) (llvm-int-type))
-  ((type-reference ty)
-   (convert-type (hash-ref env ty (lambda () (error 'convert-type "Unknown type reference ~a in ~a" ty env))) env))
-  ((function-type arg-types return-type)
-   (closure-ptr-type
-    (create-fun-type (map (lambda (ty) (convert-type ty env)) arg-types) (convert-type return-type env))
-    0))
+(define (convert-type type)
+ (cond
+  ((int-type? type) (llvm-int-type))
+  ((unit-type? type) (llvm-int-type))
+  ((function-type? type)
+   (let ((arg-types (function-type-arg-types type)) (return-type (function-type-return-type type)))
+    (closure-ptr-type
+     (create-fun-type (map convert-type arg-types) (convert-type return-type))
+     0)))
   (else (error 'convert-type "Unsupported Type ~a" type))))
 
-(define (make-function-type ty env)
- (match ty
-  ((function-type arg-types return-type)
-   (let ((arg-types (for/list ((t arg-types)) (convert-type t env)))
-         (return-type (convert-type return-type env)))
-    (create-fun-type arg-types return-type)))))
+(define (convert-function-type ty)
+ (let ((arg-types (for/list ((t (function-type-arg-types ty))) (convert-type t)))
+       (return-type (convert-type (function-type-return-type ty))))
+  (create-fun-type arg-types return-type)))
 
 
 (define (create-fun-type llvm-arg-types llvm-return-type)
@@ -152,13 +149,10 @@
   
 
 (define (int-cast value type env)
- (match type
-  ((int-type) value)
-  ((type-reference ty)
-   (int-cast value (hash-ref env ty (lambda () (error 'int-cast "Unknown type reference ~a in ~a" ty env))) env))
-  ((unit-type) value)
-  ((function-type arg-types return-type)
-   (llvm-ptr-to-int value))
+ (cond 
+  ((int-type? type) value)
+  ((unit-type? type) value)
+  ((function-type? type) (llvm-ptr-to-int value))
   (else (error 'int-cast "Unsupported-type ~a" type))))
 
 
@@ -168,21 +162,15 @@
   (define (recur expr)
    (match expr
     ((identifier id) (lookup-identifier id env))
-    ((integer-literal x) (llvm-int x))
-    ((bind id expr body)
+    ((bind id ty expr body)
      (let ((expr-value (recur expr)))
       ((compile (hash-set env id expr-value)) body)))
-    ((string-literal s) (error 'compile "Not Yet Implemented: string-literal"))
-    ((negation x) (llvm- 0 (recur x)))
-    ((math op left right)
-     (let ((l (recur left)) (r (recur right)))
-      (compile-math op l r)))
-    ((sequence exprs)
-     (foldl (lambda (e acc) (recur e)) #f exprs))
-    ((function-call function args)
-     (let ((f (recur function)) (args (map recur args)))
-      (compile-closure-call f args)))
-    ((if-then-else c t f)
+    ((primop-expr op exprs)
+     (let ((vals (map recur exprs)))
+      (compile-primop op vals)))
+    ((sequence first rest)
+     (recur first) (recur rest))
+    ((conditional c t f)
      (let ((cv (recur c)))
       (let ((cond (llvm-/= cv 0)))
        (define-basic-block t-block f-block m-block)
@@ -203,9 +191,9 @@
      (define llvm-fun-types
       (for/list ((f functions))
        (match f ((lifted-function type arg-names closed-names closed-types body)
-         (match type ((function-type arg-types return-type)
-          (create-fun-type (map (lambda (t) (convert-type t info-env)) arg-types)
-                           (convert-type return-type info-env))))))))
+         (let ((arg-types (function-type-arg-types type)) (return-type (function-type-return-type type)))
+          (create-fun-type (map (lambda (t) (convert-type t)) arg-types)
+                           (convert-type return-type)))))))
      (define closures
       (map (lambda (t n) (llvm-malloc (closure-type t n))) llvm-fun-types num-closed-variables))
      (define zero-closures
@@ -225,6 +213,18 @@
     (else
      (error 'compile "Not yet implemented: ~a" expr))))
   recur)
+
+
+ (define (compile-primop op vals)
+  (match op
+   ((math-primop sym) (compile-math sym (first vals) (second vals)))
+   ((integer-constant-primop val) val)
+   ;((nil-primop) (llvm-null))
+   ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
+   ((runtime-primop type name)
+    (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
+   (else (error 'compile-primop "Unsupported primop: ~a" op))))
+
 
  (define (compile-math op l r)
   (define (up-convert x)

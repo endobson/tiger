@@ -4,14 +4,14 @@
 
 (require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt" "fix-loops.rkt")
 
-;(require "lifter.rkt" "code-gen.rkt")
+(require "lifter.rkt" "code-gen.rkt")
 
 (require (prefix-in source->inter: "source-intermediate-transform.rkt"))
 (require (prefix-in inter->ir: "intermediate-ir-transform.rkt"))
 
 (require racket/file racket/system)
 
-(provide full-compile #;compile-llvm)
+(provide full-compile compile-llvm)
 
 
 
@@ -40,15 +40,15 @@
 
 (define (full-compile s/p)
  (let ((checked-program (check-semantics (parse s/p))))
-  (fix-loops
-   (source->inter:transform 
-    checked-program
-    source->inter:global-env
-    source->inter:global-type-env))
-#;
-  (compile-program (source-ast->lifted-ast checked-program))))
+  (compile-program
+   (lift
+    (inter->ir:transform
+     (fix-loops
+      (source->inter:transform 
+       checked-program
+       source->inter:global-env
+       source->inter:global-type-env)))))))
 
-#;
 (define (compile-llvm program exe-path-string)
  (define exe-path 
   (cond
