@@ -121,8 +121,8 @@
                 (return-type (convert (function-type-return-type type))))
             (closure-ptr-type (create-fun-type arg-types return-type) 0)))
          ((record-type? type)
-          (let ((field-types (map convert (map (inst cdr Symbol type) (record-type-fields type)))))
-            (llvm-ptr (LLVMStructTypeInContext (current-context) field-types))))
+          (let ((field-types (map convert (map cdr (record-type-fields type)))))
+            (llvm-ptr-type (LLVMStructTypeInContext (current-context) field-types #f))))
          (else (error 'create-recursive-type "Unsupported type ~a")))))
       (let ((handle (LLVMCreateTypeHandle opaque)))
        (LLVMRefineType opaque rec-type)
@@ -238,10 +238,22 @@
    ((math-primop sym) (compile-math sym (first vals) (second vals)))
    ((integer-constant-primop val) val)
    ((nil-primop type) (llvm-null (convert-type type)))
+   ((create-record-primop type) (compile-create-record (convert-type type) vals))
+   ((field-ref-primop type name) (compile-field-ref type name (first vals)))
    ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
    (else (error 'compile-primop "Unsupported primop: ~a" op))))
+
+ (define (compile-create-record type vals)
+  (let ((mem (llvm-malloc (llvm-get-element-type type))))
+   (for ((v vals) (i (in-naturals)))
+    (llvm-store v (llvm-gep mem 0 i)))
+   mem))
+
+ (define (compile-field-ref type name val)
+  (llvm-load (llvm-gep val 0 (record-type-field-index type name))))
+
 
 
  (define (compile-math op l r)

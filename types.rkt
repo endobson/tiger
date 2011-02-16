@@ -43,10 +43,12 @@
 
  record-type-has-field?
  record-type-field-type
+ record-type-field-index
  make-function-type
  (rename-out
   (function-type-return-type* function-type-return-type)
-  (function-type-arg-types function-type-arg-types)
+  (function-type-arg-types* function-type-arg-types)
+  (record-type-fields* record-type-fields)
   (array-type-elem-type* array-type-elem-type)
   (box-type-elem-type* box-type-elem-type)))
 
@@ -237,6 +239,18 @@
       (error 'record-type-has-field? "Uninitialized type"))))
 
 
+
+(: record-type-field-index (record-type Symbol -> Natural))
+(define (record-type-field-index r-type sym)
+ (let ((fields (record-type-fields r-type)))
+  (if fields
+      (let/ec: esc : Natural
+       (for: ((field : (Pair Symbol type) fields) (i : Natural (in-naturals)))
+          (and (equal? sym (car field)) (esc i)))
+       (error 'record-field-type "Record type ~a has no field of name ~a" r-type sym))
+      (error 'record-field-type "Uninitialized type"))))
+
+
 (: record-type-field-type (record-type Symbol -> type))
 (define (record-type-field-type r-type sym)
  (let ((fields (record-type-fields r-type)))
@@ -257,6 +271,11 @@
  (or (function-type-arg-types f-type)
   (error 'function-type-arg-types* "Uninitialized type")))
 
+
+(: record-type-fields* (record-type -> (Listof (Pair Symbol type))))
+(define (record-type-fields* type)
+ (or (record-type-fields type)
+  (error 'record-type-fields* "Unitialized type")))
 
 (: array-type-elem-type* (array-type -> type))
 (define (array-type-elem-type* a-type)

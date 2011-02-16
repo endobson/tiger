@@ -86,7 +86,7 @@
         ((open-paren ty-seq close-paren arrow ty) (make-function-type $2 $5))
         ((ty arrow ty) (make-function-type (list $1) $3))
         ((open-brace tyfields close-brace) (make-record-type $2))
-        ((array of id) (make-array-type $3)))
+        ((array of id) (make-array-type (make-type-reference $3))))
     
     (tyfields (() empty)
               ((id colon id tyfields-comma) (cons (cons $1 (make-type-reference $3)) $4)))
