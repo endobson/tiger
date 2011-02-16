@@ -100,21 +100,36 @@
  module)
 
 
-(define (convert-type type)
- (cond
-  ((int-type? type) (llvm-int-type))
-  ((unit-type? type) (llvm-int-type))
-  ((function-type? type)
-   (let ((arg-types (function-type-arg-types type)) (return-type (function-type-return-type type)))
-    (closure-ptr-type
-     (create-fun-type (map convert-type arg-types) (convert-type return-type))
-     0)))
-  (else (error 'convert-type "Unsupported Type ~a" type))))
-
 (define (convert-function-type ty)
  (let ((arg-types (for/list ((t (function-type-arg-types ty))) (convert-type t)))
        (return-type (convert-type (function-type-return-type ty))))
   (create-fun-type arg-types return-type)))
+
+(define (convert-type type)
+ (define types (make-hash))
+ (define (convert type)
+  (hash-ref types type
+   (lambda ()
+    (let ((opaque (LLVMOpaqueTypeInContext (current-context))))
+     (hash-set! types type opaque)
+     (let ((rec-type
+        (cond
+         ((int-type? type) (llvm-int-type))
+         ((unit-type? type) (llvm-int-type))
+         ((function-type? type)
+          (let ((arg-types (map convert (function-type-arg-types type)))
+                (return-type (convert (function-type-return-type type))))
+            (closure-ptr-type (create-fun-type arg-types return-type) 0)))
+         (else (error 'create-recursive-type "Unsupported type ~a")))))
+      (let ((handle (LLVMCreateTypeHandle opaque)))
+       (LLVMRefineType opaque rec-type)
+       (let ((real-type (LLVMResolveTypeHandle handle)))
+        (hash-set! types type real-type)
+        (LLVMDisposeTypeHandle handle)
+        real-type)))))))
+ (convert type))
+       
+    
 
 
 (define (create-fun-type llvm-arg-types llvm-return-type)
