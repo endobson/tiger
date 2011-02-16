@@ -170,7 +170,7 @@
     (val ((lvalue) $1)
          ((literal) $1))
     (literal ((integer-literal) $1)
-             ((nil) (make-nil)))
+             ((nil) (make-nil #f)))
     (integer-literal ((integer) (make-integer-literal $1)))
     (id ((identifier) $1))
     

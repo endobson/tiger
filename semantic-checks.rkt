@@ -41,9 +41,9 @@
      (assignment (recur value) (recur expr)))
     ((if-then-else c t f)
      (if-then-else (recur c) (recur t) (and f (recur f))))
-    ((integer-literal v) (integer-literal v))
-    ((string-literal s) (string-literal s))
-    ((nil) (nil))
+    ((integer-literal v) prog)
+    ((string-literal s) prog)
+    ((nil ref) prog)
     ((negation expr) (negation (recur expr)))
     ((function-call fun args)
      (function-call (recur fun) (map recur args)))
@@ -250,7 +250,7 @@
      (and (recur c) (recur t) (and f (recur f))))
     ((integer-literal v) #t)
     ((string-literal s) #t)
-    ((nil) #t)
+    ((nil _) #t)
     ((negation expr) (recur expr))
     ((function-call fun args)
      (and (recur fun) (andmap recur args)))
@@ -275,7 +275,6 @@
        
   recur)
  ((check #f) prog))
-
 
 
 

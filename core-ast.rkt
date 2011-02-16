@@ -16,7 +16,7 @@
 
 (define-struct: integer-literal ((value : Integer)))
 (define-struct: string-literal ((value : String)))
-(define-struct: nil ())
+(define-struct: nil ((type : (Option type-reference))))
 
 (define-type Constant (U integer-literal string-literal nil))
 (define-predicate constant? Constant)

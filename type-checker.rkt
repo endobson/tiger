@@ -128,8 +128,8 @@
    (expression -> (values expression pos-type))))
 
 
- (: rename (type-environment -> updater))
- (define (rename env)
+ (: type-check (type-environment -> updater))
+ (define (type-check env)
   (: recur updater)
   (define (recur prog)
    (match prog
@@ -154,7 +154,7 @@
           (error 'type-check "Annotated type ~a does not match actual type ~a" ty a-type))))
     ((binder declarations body)
      (let-values (((declarations env) (extend-environment declarations env)))
-      (let ((recur (rename env)))
+      (let ((recur (type-check env)))
        (let-values (((body type) (recur body)))
         (values (binder declarations body) type)))))
     ((sequence exprs) 
@@ -191,7 +191,8 @@
        (error 'type-check "The condition of a conditional ~a had type ~a instead of type int" c c-type))))
     ((integer-literal v) (values prog (int-type)))
     ((string-literal s) (values prog (string-type)))
-    ((nil) (values prog 'nil))
+    ((nil #f) (values prog 'nil))
+    ((nil _) (error 'type-check "Already annotated nil ~a" prog))
     ((negation expr)
      (let-values (((expr type) (recur expr)))
       (if (int-type? type)
@@ -275,6 +276,183 @@
        
   recur)
   
+
+ (define-type nil-updater 
+  (case-lambda 
+   (lvalue -> lvalue)
+   (expression -> expression)
+   (declaration -> declaration)))
+ (: nil-annotate (type-environment -> nil-updater))
+ (define (nil-annotate env)
+  (: pos-fix (type-environment -> (expression type-reference -> expression)))
+  (define ((pos-fix env) expr ref)
+   (let ((ty (resolve-type ref env)))
+    ((search (and (record-type? ty) ref) env) expr)))
+
+
+  (: fix-declarations ((Listof declaration) type-environment ->
+                       (values (Listof declaration) type-environment)))
+  (define (fix-declarations decs env)
+   (if (empty? decs) (values empty env)
+    (let ((dec (first decs)))
+     (match dec
+      ((function-declaration name args type body)
+       (let-values (((fun-decs decs) (span function-declaration? decs)))
+        (let-values (((fun-decs env) (fix-function-declarations fun-decs env)))
+         (let-values (((decs env) (fix-declarations decs env)))
+          (values (append fun-decs decs) env)))))
+      ((variable-declaration name type value)
+       (let ((value ((search type env) value)))
+        (let-values (((decs env) (fix-declarations (rest decs) env)))
+         (values (cons (variable-declaration name type value) decs) env))))
+      ((untyped-variable-declaration name value)
+       (error 'nil-annotate "Unremoved untyped-variable-declaration"))
+      ((type-declaration name type)
+       (let-values (((decs env)
+                     (fix-declarations (rest decs)
+                                       (add-type name
+                                                 (if (type-reference? type)
+                                                     (resolve-type type env)
+                                                     type)
+                                                 env))))
+        (values (cons dec decs) env)))))))
+
+  (: fix-function-declarations ((Listof function-declaration) type-environment ->
+                                (values (Listof function-declaration) type-environment)))
+  (define (fix-function-declarations decs env)
+   (let ((env (add-identifiers
+          (map (inst cons Symbol value-type)
+               (map function-declaration-name decs)
+               (map function-declaration->function-type decs)) env)))
+     (: fix-function-declaration (function-declaration -> function-declaration))
+     (define (fix-function-declaration dec)
+      (match dec
+       ((function-declaration name args type body)
+        (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
+         (let ((body ((search type (add-identifiers args-typed env)) body)))
+          (function-declaration name args type body))))))
+
+    (values (map fix-function-declaration decs) env)))
+
+   
+
+  (: search ((Option type-reference) type-environment -> nil-updater))
+  (define (search ref env)
+   (: recur nil-updater)
+   (define (recur prog)
+    (match prog
+     ((identifier sym) prog)
+     ((field-ref base field ty) (field-ref ((search ty env) base) field ty))
+     ((array-ref base index ty) (array-ref ((search #f env) base) ((search #f env) index) ty))
+     ((binder declarations body)
+       (let-values (((decls env) (fix-declarations declarations env)))
+        (binder decls ((search ref env) body))))
+     ((sequence exprs)
+      (sequence 
+       (if ref
+        (let ((rexprs (reverse exprs)))
+         (reverse (cons (recur (first rexprs)) (map (search #f env) (rest rexprs)))))
+        (map recur exprs))))
+     ((assignment value expr)
+      (let ((ty (type-of value env)))
+       (assignment ((search #f env) value)
+         ((search (and (record-type? ty) (unresolve-type ty env)) env) expr))))
+     ((if-then-else c t f)
+      (if-then-else ((search #f env) c) (recur t) (and f (recur f))))
+     ((integer-literal v) prog)
+     ((string-literal s) prog)
+     ((nil #f)
+      (if ref
+          (nil ref)
+          (error 'nil-annotate "Nil with unknown type")))
+     ((nil _)
+      (error 'nil-annotate "Nil already has annotated type"))
+     ((negation expr) (negation (recur expr)))
+     ((function-call fun args)
+      (let ((ty (type-of fun env)))
+       (if (function-type? ty)
+           (function-call ((search #f env) fun)
+            (map (pos-fix env) args (function-type-args ty)))
+           (error 'nil-annotate "Tried to call an expression of non function type"))))
+     ((math op left right)
+      (math op (recur left) (recur right)))
+     ((create-record type fields)
+      (let ((rtype (resolve-type type env)))
+       (if (record-type? rtype)
+           (create-record type
+            (map (inst cons Symbol expression)
+             (map (inst car Symbol expression) fields)
+             (map (pos-fix env)
+              (map (inst cdr Symbol expression) fields)
+              (map (inst cdr Symbol type-reference) (record-type-fields rtype)))))
+           (error 'nil-annotate "Create record tries to create non record type"))))
+     ((create-array type size value)
+      (create-array type (recur size) (recur value)))
+     ((while-loop guard body)
+      (while-loop (recur guard) (recur body)))
+     ((for-loop id init final body)
+      (for-loop id (recur init) (recur final) (recur body)))
+     ((break) prog)
+     ((type-declaration name type) prog)
+     ((function-declaration name args return-type body)
+      (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference)))
+                              (cons (car pair) (resolve-type (cdr pair) env))) args)))
+       (function-declaration name args return-type
+        (let ((env (add-identifiers args-typed env)))
+         (if return-type
+             ((pos-fix env) body return-type)
+             ((search #f env) body))))))
+     ((variable-declaration sym type value)
+      (variable-declaration sym type 
+       ((pos-fix env) value type)))
+     ((untyped-variable-declaration sym value)
+      (error 'nil-annotate "Remaining untyped-variable-declaration ~a" prog))))
+   recur)
+
+   
+       
+  (search #f env))
+
+
+
+
+
+
+
+ (: type-of (expression type-environment -> pos-type))
+ (define (type-of expr env)
+  (match expr
+   ((identifier sym) (lookup-identifier-type sym env))
+   ((field-ref base field ty) (if ty (resolve-type ty env) (error 'type-of "Unannotated field-ref")))
+   ((array-ref base index ty) (if ty (resolve-type ty env) (error 'type-of "Unannotated array-ref")))
+   ((binder declarations body)
+    (error 'type-of "Binder not implemented"))
+   ((sequence exprs)
+    (if (empty? exprs) (unit-type) (type-of (last exprs) env)))
+   ((assignment value expr)
+    (type-of value env))
+   ((if-then-else c t f)
+    (type-of t env))
+   ((integer-literal v) (int-type))
+   ((string-literal s) (string-type))
+   ((nil #f) 'nil)
+   ((nil _)
+    (error 'type-of "Nil already has annotated type"))
+   ((negation expr) (int-type))
+   ((function-call fun args)
+    (let ((ty (type-of fun env)))
+     (if (function-type? ty)
+         (let ((ret-type (function-type-return ty)))
+          (if ret-type (resolve-type ret-type env) (unit-type)))
+         (error 'type-of "Tried to call an expression of non function type"))))
+   ((math op left right) (int-type))
+   ((create-record type fields) (resolve-type type env))
+   ((create-array type size value) (resolve-type type env))
+   ((while-loop guard body) (unit-type))
+   ((for-loop id init final body) (unit-type))
+   ((break) (unit-type))))
+
+
  
  (: lookup-identifier-type (Symbol type-environment -> value-type))
  (define (lookup-identifier-type sym env)
@@ -321,14 +499,14 @@
          (let-values (((decs env) (extend-environment decs env)))
           (values (append fun-decs decs) env)))))
       ((variable-declaration name type value)
-       (let-values (((value v-type) ((rename env) value)))
+       (let-values (((value v-type) ((type-check env) value)))
         (let ((r-type (resolve-type type env)))
         (if (equal? r-type v-type)
             (let-values (((decs env) (extend-environment (rest decs) (add-identifier name r-type env))))
              (values (cons (variable-declaration name type value) decs) env))
             (error 'type-check "Variable declaration type ~a does not match type of expression ~a" type v-type)))))
       ((untyped-variable-declaration name value)
-       (let-values (((value v-type) ((rename env) value)))
+       (let-values (((value v-type) ((type-check env) value)))
         (if (equal? 'nil v-type)
             (error 'type-check "Untyped variable declaration expression ~a has nil-type" value)
             (if (unit-type? v-type)
@@ -354,7 +532,7 @@
      (match dec
       ((function-declaration name args type body)
        (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
-        (let-values (((body b-type) ((rename (add-identifiers args-typed env)) body)))
+        (let-values (((body b-type) ((type-check (add-identifiers args-typed env)) body)))
          (if (if type (equal? b-type (resolve-type type env))
                  (unit-type? b-type))
              (function-declaration name args type body)
@@ -452,7 +630,8 @@
 
 
 
- (let-values (((prog type) ((rename env) prog)))
-   prog))
+ (let-values (((prog type) ((type-check env) prog)))
+   ((nil-annotate env) prog)))
+
 
 

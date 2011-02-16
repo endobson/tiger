@@ -29,7 +29,7 @@
 (define-struct: call-closure-primop () #:transparent)
 (define-struct: integer-constant-primop ((val : Integer)) #:transparent)
 (define-struct: string-constant-primop ((val : String)) #:transparent)
-(define-struct: nil-primop () #:transparent)
+(define-struct: nil-primop ((type : type)) #:transparent)
 (define-struct: runtime-primop ((type : type) (name : Symbol)) #:transparent)
 
 (define-struct: array-set!-primop ((type : array-type)) #:transparent)

@@ -123,7 +123,8 @@
     ((source:binder decls expr)
      (if (empty? decls) (recur expr)
        (match (first decls)
-        ((source:untyped-variable-declaration var body) (error "Untyped variable declaration remains"))
+        ((source:untyped-variable-declaration var body)
+         (error 'transform "Untyped variable declaration remains"))
         ((source:variable-declaration var type body)
          (inter:bind var (lookup-type-reference type type-env) (recur body)
           ((trans (hash-set env var #t) type-env)  (source:binder (rest decls) expr))))
@@ -143,7 +144,10 @@
     ((source:break) (inter:break))
     ((source:integer-literal num) (inter:primop-expr (integer-constant-primop num) empty))
     ((source:string-literal str) (inter:primop-expr (string-constant-primop str) empty))
-    ((source:nil) (inter:primop-expr (nil-primop) empty))
+    ((source:nil ref)
+     (if ref
+         (inter:primop-expr (nil-primop (lookup-type-reference ref type-env)) empty)
+         (error 'transform "Untyped nil remains")))
     ))
   recur)
  
@@ -153,7 +157,7 @@
  (: lookup-type (Symbol (HashTable Symbol inter:type) -> inter:type))
  (define (lookup-type name env)
   (hash-ref env name
-   (lambda () (error 'transform "Unbound type referenece ~a in ~a" name env))))
+   (lambda () (error 'transform "Unbound type refernece ~a in ~a" name env))))
  
  (: transform-function-declarations
   ((Listof source:function-declaration) (HashTable Symbol #t) (HashTable Symbol inter:type) ->
