@@ -19,12 +19,13 @@
     field-set!-primop
     create-array-primop
     create-record-primop
-
+    equality-primop
     
     
     ))
 
-(define-struct: math-primop ((symbol : (U '+ '- '* '/ '= '<> '<= '>= '< '> '& '\|))) #:transparent)
+(define-struct: math-primop ((symbol : (U '+ '- '* '/ '<= '>= '< '> '& '\|))) #:transparent)
+(define-struct: equality-primop ((equality : Boolean) (type : type)) #:transparent)
 (define-struct: unit-primop () #:transparent)
 (define-struct: call-closure-primop () #:transparent)
 (define-struct: integer-constant-primop ((val : Integer)) #:transparent)

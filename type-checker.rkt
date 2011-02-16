@@ -219,6 +219,21 @@
               (values (math op left right) l-type)
               (error 'type-check "The right expression of the math operation ~a, ~a had type ~a instead of int" op right r-type))
           (error 'type-check "The left expression of the math operation ~a, ~a had type ~a instead of int" op left l-type))))
+    ((equality op left right type)
+     (if type
+         (error "Already annotated equality: ~a" prog)
+         (let-values (((left l-type) (recur left))
+                      ((right r-type) (recur right)))
+          (let ((res-type
+                 (cond
+                  ((and (equal? 'nil l-type) (equal? 'nil r-type))
+                   (error 'type-check "Both sides of equality are nil ~a" prog))
+                  ((and (equal? 'nil l-type) (record-type? r-type)) r-type)
+                  ((and (equal? 'nil r-type) (record-type? l-type)) l-type)
+                  ((not (equal? l-type r-type))
+                   (error 'type-check "Type ~a and ~a cannot be compared" l-type r-type))
+                  (else r-type))))
+            (values (equality op left right (unresolve-type res-type env)) (int-type))))))
     ((create-record type fields)
      (: check-field ((Pair Symbol type-reference) (Pair Symbol expression) -> (Pair Symbol expression)))
      (define (check-field type-pair expr-pair)
@@ -600,25 +615,22 @@
 
    
 
-  (: reference-dag dag)
-  (: cycle Boolean)
-  (: ordered (Listof type-declaration))
-  (: fixed-decls (Listof type-declaration))
-  (: final-env type-environment )
-  (define reference-dag (compute-reference-dag types (make-immutable-hash empty)))
-  (define cycle 
-   (for/fold: : Boolean
-    ((result : Boolean #f))
-    ((dec : type-declaration types))
-    (or result 
-     (match dec
-      ((type-declaration name ty)
-       (cycle-exists? name reference-dag))))))
-  (when cycle
-   (error 'type-check "Cycle in type declarations ~a" types))
-  (define ordered (reverse (make-ordered reference-dag types (make-table types))))
-  (define final-env (foldl extend env ordered))
-  (values ordered final-env))
+  (let* ((reference-dag (compute-reference-dag types (make-immutable-hash empty)))
+         (cycle 
+          (for/fold: : Boolean
+           ((result : Boolean #f))
+           ((dec : type-declaration types))
+           (or result 
+            (match dec
+             ((type-declaration name ty)
+              (cycle-exists? name reference-dag)))))))
+   (when cycle
+    (error 'type-check "Cycle in type declarations ~a" types))
+   (: ordered (Listof type-declaration))
+   (: final-env type-environment )
+   (define ordered (reverse (make-ordered reference-dag types (make-table types))))
+   (define final-env (foldl extend env ordered))
+   (values ordered final-env)))
 
 
 

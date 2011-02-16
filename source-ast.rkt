@@ -50,7 +50,8 @@
 (define-struct: function-call ((fun : expression) (args : (Listof expression))))
 
 (define-struct: negation ((expr : expression)))
-(define-struct: math ((operator : (U '+ '* '/ '- '= '<> '< '> '<= '>= '& '\| )) (left : expression) (right : expression)))
+(define-struct: equality ((operator : (U  '= '<> )) (left : expression) (right : expression) (type : (Option type-reference))))
+(define-struct: math ((operator : (U '+ '* '/ '- '< '> '<= '>= '& '\| )) (left : expression) (right : expression)))
 
 (define-struct: create-record ((type : type-reference) (fields : (Listof (Pair Symbol expression)))))
 (define-struct: create-array ((type : type-reference) (size : expression) (value : expression)))

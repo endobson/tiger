@@ -59,6 +59,10 @@
        empty)))
     ((source:math symbol left right)
      (inter:primop-expr (math-primop symbol) (list (recur left) (recur right))))
+    ((source:equality symbol left right type)
+     (if type
+         (inter:primop-expr (equality-primop (equal? symbol '=) (lookup-type-reference type type-env)) (list (recur left) (recur right)))
+         (error 'transform "Unannotated equality: ~a" prog)))
     ((source:negation expr)
      (inter:primop-expr (math-primop '-) (list (inter:primop-expr (integer-constant-primop 0) empty) (recur expr))))
     ((source:function-call fun args)

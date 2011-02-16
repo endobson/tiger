@@ -13,7 +13,7 @@
 (define-empty-tokens lang-empty-tokens
   (eof for nil break period comma semi-colon colon
    space plus minus and or arrow
-   equal of if then else while do to let in end
+   equal not-equal of if then else while do to let in end
    type array var function
    assignment open-paren close-paren open-bracket
    close-bracket open-brace close-brace))
@@ -59,8 +59,9 @@
    ((char-set "*/") (token-*/ (string->symbol lexeme)))
    (":=" (token-assignment))
    ("=" (token-equal))
+   ("<>" (token-not-equal))
    ("." (token-period))
-   ((:or "<>" "<" "<=" ">" ">=")
+   ((:or "<" "<=" ">" ">=")
     (token-comparison (string->symbol lexeme)))
    ((:: alphabetic (:* alphabetic digit #\")) (token-identifier (string->symbol lexeme)))
    ((eof) (token-eof))))
@@ -109,7 +110,8 @@
           ((expr and expr) (make-math '& $1 $3))
           ((expr or expr) (make-math '\| $1 $3))
           ((expr comparison expr) (make-math $2 $1 $3))
-          ((expr equal expr) (make-math '= $1 $3))
+          ((expr equal expr) (make-equality '= $1 $3))
+          ((expr not-equal expr) (make-equality '<> $1 $3))
 
           ((lvalue assignment expr) (make-assignment $1 $3))
           ((expr open-paren close-paren) (make-function-call $1 empty))
@@ -187,7 +189,7 @@
     (right assignment)
     (left or)
     (left and)
-    (nonassoc comparison equal)
+    (nonassoc comparison equal not-equal)
     (left plus)
     (left */)
     (nonassoc minus)

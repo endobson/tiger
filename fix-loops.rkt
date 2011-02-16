@@ -114,7 +114,7 @@
                                               (list
                                                (primop-expr (integer-constant-primop 1) empty)
                                                (identifier var))))))))
-                          (conditional (primop-expr (math-primop '=) (list (identifier var) (identifier final-name)))
+                          (conditional (primop-expr (equality-primop #t int-type) (list (identifier var) (identifier final-name)))
                             (cps body (identifier cont-name) env)
                             (primop-expr (unit-primop) empty))))))
        (primop-expr (call-closure-primop) (list (identifier init-name))))))))))

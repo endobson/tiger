@@ -120,6 +120,9 @@
           (let ((arg-types (map convert (function-type-arg-types type)))
                 (return-type (convert (function-type-return-type type))))
             (closure-ptr-type (create-fun-type arg-types return-type) 0)))
+         ((record-type? type)
+          (let ((field-types (map convert (map (inst cdr Symbol type) (record-type-fields type)))))
+            (llvm-ptr (LLVMStructTypeInContext (current-context) field-types))))
          (else (error 'create-recursive-type "Unsupported type ~a")))))
       (let ((handle (LLVMCreateTypeHandle opaque)))
        (LLVMRefineType opaque rec-type)
@@ -234,7 +237,7 @@
   (match op
    ((math-primop sym) (compile-math sym (first vals) (second vals)))
    ((integer-constant-primop val) val)
-   ;((nil-primop) (llvm-null))
+   ((nil-primop type) (llvm-null (convert-type type)))
    ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
@@ -248,7 +251,8 @@
    (values
     (llvm-/= x 0)
     (llvm-/= y 0)))
-
+  (define ((wrap f) . args)
+   (apply f args))
 
   ((case op
    ((+) llvm+)
@@ -258,8 +262,8 @@
    ((=) (compose up-convert llvm-=))
    ((<=) (compose up-convert llvm-<=))
    ((<>) (compose up-convert llvm-/=))
-   ((\|) (compose up-convert llvm-or down-convert))
-   ((&) (compose up-convert llvm-and down-convert))
+   ((\|) (compose up-convert (wrap llvm-or) down-convert))
+   ((&) (compose up-convert (wrap llvm-and) down-convert))
    (else (error 'compile "Math operator ~a not yet implemented" op))) l r))
 
  (define (compile-closure-call closure args)
