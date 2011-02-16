@@ -239,7 +239,12 @@
    ((integer-constant-primop val) val)
    ((nil-primop type) (llvm-null (convert-type type)))
    ((create-record-primop type) (compile-create-record (convert-type type) vals))
+   ((create-array-primop type) (compile-create-array
+                                 (convert-type (array-type-elem-type type))
+                                 (first vals)
+                                 (second vals)))
    ((field-ref-primop type name) (compile-field-ref type name (first vals)))
+   ((array-ref-primop type) (compile-array-ref type (first vals) (second vals)))
    ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
@@ -253,6 +258,20 @@
 
  (define (compile-field-ref type name val)
   (llvm-load (llvm-gep val 0 (record-type-field-index type name))))
+
+
+ (define (compile-create-array type size val)
+  (let ((mem (llvm-bit-cast (llvm-array-malloc type size) (llvm-ptr-type (LLVMArrayType type 0)))))
+   (for ((i (in-range size)))
+    (llvm-store val (llvm-gep mem 0 i)))
+   mem))
+
+
+ (define (compile-array-ref type array index)
+  (llvm-load (llvm-gep array 0 index)))
+
+
+
 
 
 

@@ -258,7 +258,7 @@
                   ((a-type) (resolve-type type env)))
       (if (array-type? a-type)
           (if (int-type? s-type)
-              (if (equal? v-type (array-type-elem-type a-type))
+              (if (equal? v-type (resolve-type (array-type-elem-type a-type) env))
                   (values (create-array type size value) a-type)
                   (error 'type-check "Inital value ~a in array creation has type ~a which does not match array type ~a"
                     value v-type a-type))

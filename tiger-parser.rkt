@@ -144,7 +144,7 @@
      
     (array-creation
      ((id open-bracket expr close-bracket of expr)
-      (make-create-array $1 $3 $6)))
+      (make-create-array (make-type-reference $1) $3 $6)))
      
      
     (+- ((plus) '+) ((minus) '-))
