@@ -53,6 +53,37 @@
     (llvm-set-position (llvm-add-block-to-function not-function))
     (llvm-ret (llvm-zext (llvm-= 0 (llvm-get-param 1)) (llvm-int-type)))
     (values name (make-closure not-function not-type "not_closure")))
+   ((getchar)
+    (define llvm-type (convert-function-type type))
+    (define real-function (llvm-add-function (llvm-fun-type (llvm-int8-type)) "getchar"))
+    (define function (llvm-add-function llvm-type "getchar_clos"))
+    (llvm-set-position (llvm-add-block-to-function function))
+    (define-basic-block error-block succ-block)
+    (let ((char (llvm-call real-function)))
+     (llvm-cond-br (llvm-= char (llvm-int -1 (llvm-int8-type))) error-block succ-block)
+     (llvm-set-position error-block)
+     (llvm-ret (llvm-null (convert-type string-type)))
+     (llvm-set-position succ-block)
+ 
+     (let ((string (llvm-alloc-string 1)))
+      (llvm-store 1 (llvm-gep string 0 0))
+      (llvm-store char (llvm-gep string 0 1 0))
+      (llvm-ret string)))
+    (values name (make-closure function llvm-type "getchar_closure")))
+   ((print)
+    (define llvm-type (convert-function-type type))
+    (define real-function (llvm-add-function
+      (llvm-fun-type (llvm-int-type) (llvm-int-type) (llvm-ptr-type (llvm-int8-type)) (llvm-int-type)) "write"))
+    (define function (llvm-add-function llvm-type "print"))
+    (llvm-set-position (llvm-add-block-to-function function))
+    (llvm-call real-function 0 (llvm-bit-cast (llvm-gep (llvm-get-param 1) 0 1) (llvm-ptr-type (llvm-int8-type))) 
+                               (llvm-load (llvm-gep (llvm-get-param 1) 0 0)))
+    (LLVMBuildRetVoid (current-builder))
+    (values name (make-closure function llvm-type "print-closure")))
+
+
+
+
    (else (values name #f)))))
     
     
@@ -137,6 +168,7 @@
         (cond
          ((int-type? type) (llvm-int-type))
          ((unit-type? type) (llvm-void-type))
+         ((string-type? type) (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) 0)) #f)))
          ((function-type? type)
           (let ((arg-types (map convert (function-type-arg-types type)))
                 (return-type (convert (function-type-return-type type))))
@@ -144,7 +176,7 @@
          ((record-type? type)
           (let ((field-types (map convert (map cdr (record-type-fields type)))))
             (llvm-ptr-type (LLVMStructTypeInContext (current-context) field-types #f))))
-         (else (error 'create-recursive-type "Unsupported type ~a")))))
+         (else (error 'create-recursive-type "Unsupported type ~a" type)))))
       (let ((handle (LLVMCreateTypeHandle opaque)))
        (LLVMRefineType opaque rec-type)
        (let ((real-type (LLVMResolveTypeHandle handle)))
@@ -183,6 +215,10 @@
 (define (closure-ptr-type llvm-fun-type num-free-variables)
  (llvm-ptr-type
   (closure-type llvm-fun-type num-free-variables)))
+
+(define (llvm-alloc-string size)
+ (let ((string (llvm-malloc (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) size)) #f))))
+  (llvm-bit-cast string (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) 0)) #f)))))
 
   
   
