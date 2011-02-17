@@ -185,7 +185,6 @@
               semi-colon 
               close-paren comma if then while do to for let in end)
     (left else)
-    (left open-paren)
     (right assignment)
     (left or)
     (left and)
@@ -193,6 +192,7 @@
     (left plus)
     (left */)
     (nonassoc minus)
+    (left open-paren)
     (right arrow)
     )
    (tokens lang-tokens lang-empty-tokens)

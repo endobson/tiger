@@ -1,8 +1,8 @@
 #lang typed/racket/base
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) make-runtime-primop))
 
-(require "types.rkt")
+(require "types.rkt" "external-functions.rkt")
 
 
 (define-type primop
@@ -40,3 +40,11 @@
 
 (define-struct: create-record-primop ((type : record-type)) #:transparent)
 (define-struct: create-array-primop ((type : array-type)) #:transparent)
+
+
+(: runtime-primop-database (HashTable Symbol runtime-primop))
+(define runtime-primop-database
+ (make-immutable-hash
+  (hash-map external-function-database
+   (lambda: ((name : Symbol) (type : function-type)) (cons name (runtime-primop type name))))))
+ 

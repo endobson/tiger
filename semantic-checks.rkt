@@ -81,7 +81,7 @@
  (define (lookup-identifier sym env)
   (hash-ref (environment-ids env) sym
    (lambda ()
-    (error 'lookup-identifier "Unbound Identifier ~a" sym))))
+    (error 'lookup-identifier "Unbound Identifier ~a in ~a" sym env))))
 
 
  (: lookup-type (Symbol environment -> Symbol))

@@ -1,13 +1,16 @@
 #lang typed/racket/base
 
 
+
+
+
 (require
 
          (prefix-in inter: "types.rkt")
          (prefix-in source: "source-ast.rkt")
          (prefix-in source: "core-ast.rkt")
          (prefix-in inter: "intermediate-ast.rkt")
-         "primop.rkt")
+         "primop.rkt" "external-functions.rkt")
 
 
 (require racket/list racket/match)
@@ -39,7 +42,9 @@
 (: global-env (HashTable Symbol runtime-primop))
 (define global-env
  (make-immutable-hash
-  (list (cons 'exit exit-primop))))
+  (hash-map external-function-database
+   (lambda: ((name : Symbol) (type : inter:function-type))
+    (cons name (runtime-primop type name))))))
 
 
 

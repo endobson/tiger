@@ -8,10 +8,56 @@
 (require racket/match racket/list unstable/hash)
 (require "lifted-ast.rkt"
          "types.rkt" 
-         "primop.rkt")
+         "primop.rkt"
+         "external-functions.rkt")
 
 (provide compile-program write-program)
 
+
+(define (add-external-functions)
+
+ (define (make-closure funval type name)
+  (define closure  (llvm-add-global (closure-type type 0) name))
+  (llvm-set-initializer
+   closure
+   (LLVMConstStructInContext (current-context)
+    (list funval (LLVMConstArray (llvm-int-type) empty))
+    #f))
+  closure)
+  
+
+ (for/hash (((name type) external-function-database))
+  (case name
+   ((exit)
+
+    (define exit-type (convert-function-type type))
+    (define real-exit-function
+     (llvm-add-function
+      (llvm-fun-type (llvm-void-type) (llvm-int-type))
+      "exit"))
+    (define exit-function
+     (llvm-add-function
+      exit-type
+      "exit_clos"))
+    
+    (llvm-set-position (llvm-add-block-to-function exit-function))
+    (llvm-call real-exit-function (llvm-get-param 1))
+    (LLVMBuildRetVoid (current-builder))
+
+    (define exit-closure (make-closure exit-function exit-type "exit_closure"))
+
+    (values name exit-closure))
+   ((not)
+    (define not-type (convert-function-type type))
+    (define not-function (llvm-add-function not-type "not"))
+    (llvm-set-position (llvm-add-block-to-function not-function))
+    (llvm-ret (llvm-zext (llvm-= 0 (llvm-get-param 1)) (llvm-int-type)))
+    (values name (make-closure not-function not-type "not_closure")))
+   (else (values name #f)))))
+    
+    
+
+  
 
 
 
@@ -25,33 +71,8 @@
       (llvm-int-type) (llvm-ptr-type (llvm-ptr-type (llvm-int8-type))))
      "main"))
 
-  (define exit-type (create-fun-type (list (llvm-int-type)) (llvm-void-type)))
 
-  (define real-exit-function
-   (llvm-add-function
-    (llvm-fun-type (llvm-void-type) (llvm-int-type))
-    "exit"))
-  (define exit-function
-   (llvm-add-function
-    exit-type
-    "exit_clos"))
-  
-  (llvm-set-position (llvm-add-block-to-function exit-function))
-  (llvm-call real-exit-function (llvm-get-param 1))
-  (LLVMBuildRetVoid (current-builder))
-
-  (define exit-closure 
-   (llvm-add-global
-    (closure-type exit-type 0)
-    "exit_closure"))
-  (llvm-set-initializer
-   exit-closure
-   (LLVMConstStructInContext (current-context)
-    (list 
-     exit-function
-     (LLVMConstArray (llvm-int-type) empty))
-    #f))
-
+  (define ext-functions (add-external-functions))
   (define function-descriptions (lifted-program-functions prog))
   (define all-functions 
    (for/hash (((name fun-desc) function-descriptions))
@@ -63,8 +84,8 @@
      
   (define info-env (hash-union function-descriptions))
   (define global-environment
-   (hash-union
-    (hash (make-runtime-primop (make-function-type (list int-type) unit-type) 'exit) exit-closure)))
+   (for/hash (((name primop) runtime-primop-database))
+    (values primop (hash-ref ext-functions name))))
 
 
   (for (((name fun-desc) function-descriptions))
@@ -115,7 +136,7 @@
      (let ((rec-type
         (cond
          ((int-type? type) (llvm-int-type))
-         ((unit-type? type) (llvm-int-type))
+         ((unit-type? type) (llvm-void-type))
          ((function-type? type)
           (let ((arg-types (map convert (function-type-arg-types type)))
                 (return-type (convert (function-type-return-type type))))

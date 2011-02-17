@@ -26,6 +26,9 @@
   (unit-type* unit-type)
   (int-type* int-type)
   (string-type* string-type))
+ Unit-Type
+ String-Type
+ Int-Type
 
 
 
@@ -74,6 +77,9 @@
 (define int-type* (int-type))
 (define string-type* (string-type))
 
+(define-type Unit-Type unit-type)
+(define-type String-Type string-type)
+(define-type Int-Type int-type)
 
 
 

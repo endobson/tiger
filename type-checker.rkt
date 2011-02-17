@@ -1,19 +1,24 @@
 #lang typed/racket/base
 
 (require racket/match racket/list)
-(require "source-ast.rkt" "core-ast.rkt" "environment.rkt")
+(require "source-ast.rkt" "core-ast.rkt" "environment.rkt" "external-functions.rkt")
+(require
+ (only-in "types.rkt"
+  string-type int-type unit-type 
+  String-Type Int-Type Unit-Type
+  string-type? int-type? unit-type?
+  (function-type other:function-type)
+  (function-type-arg-types other:function-type-arg-types)
+  (function-type-return-type other:function-type-return-type)))
 
 
 (provide type-check global-type-environment)
 
 
 (define-type type (U primitive-type compound-type))
-(define-type primitive-type (U int-type string-type unit-type))
-(define-type value-type (U string-type int-type compound-type))
+(define-type primitive-type (U Int-Type String-Type Unit-Type))
+(define-type value-type (U String-Type Int-Type compound-type))
 
-(define-struct: int-type () #:transparent)
-(define-struct: string-type () #:transparent)
-(define-struct: unit-type () #:transparent)
 
 
 
@@ -24,26 +29,24 @@
 
 (: global-type-environment type-environment)
 (define global-type-environment
- (let ((mtr (lambda: ((lst : (Listof Symbol))) (map type-reference lst)))
-       (string (type-reference 'string))
-       (int (type-reference 'int)))
+ (let* ((string (type-reference 'string))
+        (int (type-reference 'int))
+        (extract-name (lambda (ty)
+         (cond ((int-type? ty) int) ((string-type? ty) string) (else (error 'extract-name)))))
+        (extract-name2 (lambda (ty)
+         (cond ((int-type? ty) int) ((string-type? ty) string) ((unit-type? ty) #f) (else (error 'extract-name))))))
   (type-environment
    (make-immutable-hash
-    (list
-     (cons 'print (function-type (mtr '(string)) #f))
-     (cons 'flush (function-type (mtr '())  #f))
-     (cons 'getchar (function-type (mtr '()) string))
-     (cons 'ord (function-type (mtr '(string)) int))
-     (cons 'chr (function-type (mtr '(int)) string))
-     (cons 'size (function-type (mtr '(string)) int))
-     (cons 'substring (function-type (mtr '(string int int)) string))
-     (cons 'concat (function-type (mtr '(string string)) string))
-     (cons 'not (function-type (mtr '(int)) int))
-     (cons 'exit (function-type (mtr '(int)) #f))))
+    (hash-map external-function-database
+     (lambda: ((key : Symbol) (val : other:function-type))
+      (cons key
+            (function-type (map extract-name (other:function-type-arg-types val))
+                           (extract-name2 (other:function-type-return-type val))))))
+    )
    (make-immutable-hash
     (list
-     (cons 'int (int-type))
-     (cons 'string (string-type)))))))
+     (cons 'int int-type)
+     (cons 'string string-type))))))
 
 
 
@@ -168,7 +171,7 @@
            (values (cons rec-expr rec-exprs) type))))
       
      (cond 
-      ((empty? exprs) (values (sequence empty) (unit-type)))
+      ((empty? exprs) (values (sequence empty) unit-type))
       (else
        (let-values (((exprs type) (rec exprs)))
         (values (sequence exprs) type)))))
@@ -183,14 +186,14 @@
      (let-values (((c c-type) (recur c)))
       (if (int-type? c-type)
        (let-values (((t t-type) (recur t))
-                    ((f f-type) (if f (recur f) (values (sequence empty) (unit-type)))))
+                    ((f f-type) (if f (recur f) (values (sequence empty) unit-type))))
         (if (equal? t-type f-type)
             (values (if-then-else c t f) t-type)
             (error 'type-check "The different branches of a conditional ~a and ~a have different types ~a and ~a"
               t f t-type f-type)))
        (error 'type-check "The condition of a conditional ~a had type ~a instead of type int" c c-type))))
-    ((integer-literal v) (values prog (int-type)))
-    ((string-literal s) (values prog (string-type)))
+    ((integer-literal v) (values prog int-type))
+    ((string-literal s) (values prog string-type))
     ((nil #f) (values prog 'nil))
     ((nil _) (error 'type-check "Already annotated nil ~a" prog))
     ((negation expr)
@@ -207,7 +210,7 @@
              (values (function-call fun args)
                      (if fun-return-type
                          (resolve-type fun-return-type env)
-                         (unit-type)))
+                         unit-type))
              (error 'type-check "Arguments ~a of types ~a did not match function argument types of ~a"
                args arg-types fun-type)))
        (else (error 'type-check "Function expression ~a of type ~a is not of a function type" fun fun-type)))))
@@ -233,7 +236,7 @@
                   ((not (equal? l-type r-type))
                    (error 'type-check "Type ~a and ~a cannot be compared" l-type r-type))
                   (else r-type))))
-            (values (equality op left right (unresolve-type res-type env)) (int-type))))))
+            (values (equality op left right (unresolve-type res-type env)) int-type)))))
     ((create-record type fields)
      (: check-field ((Pair Symbol type-reference) (Pair Symbol expression) -> (Pair Symbol expression)))
      (define (check-field type-pair expr-pair)
@@ -269,12 +272,12 @@
                   ((body b-type) (recur body)))
       (if (int-type? g-type)
           (if (unit-type? b-type)
-              (values (while-loop guard body) (unit-type))
+              (values (while-loop guard body) unit-type)
               (error 'type-check "While loop body ~a has type ~a instead of unit-type" body b-type))
           (error 'type-check "While loop condition ~a has type ~a instead of int-type" guard g-type))))
     ((for-loop id init final body)
      (error 'type-check "Not yet implemented for-loop"))
-    ((break) (values (break) (unit-type)))
+    ((break) (values (break) unit-type))
     ((type-declaration name type) prog)
     ((function-declaration name args return-type body)
      (error 'type-check "Not yet implemented function-declaration"))
@@ -318,7 +321,7 @@
           (values (append fun-decs decs) env)))))
       ((variable-declaration name type value)
        (let ((value ((search type env) value)))
-        (let-values (((decs env) (fix-declarations (rest decs) env)))
+        (let-values (((decs env) (fix-declarations (rest decs) (add-identifier name (resolve-type type env) env))))
          (values (cons (variable-declaration name type value) decs) env))))
       ((untyped-variable-declaration name value)
        (error 'nil-annotate "Unremoved untyped-variable-declaration"))
@@ -443,29 +446,29 @@
    ((binder declarations body)
     (error 'type-of "Binder not implemented"))
    ((sequence exprs)
-    (if (empty? exprs) (unit-type) (type-of (last exprs) env)))
+    (if (empty? exprs) unit-type (type-of (last exprs) env)))
    ((assignment value expr)
     (type-of value env))
    ((if-then-else c t f)
     (type-of t env))
-   ((integer-literal v) (int-type))
-   ((string-literal s) (string-type))
+   ((integer-literal v) int-type)
+   ((string-literal s) string-type)
    ((nil #f) 'nil)
    ((nil _)
     (error 'type-of "Nil already has annotated type"))
-   ((negation expr) (int-type))
+   ((negation expr) int-type)
    ((function-call fun args)
     (let ((ty (type-of fun env)))
      (if (function-type? ty)
          (let ((ret-type (function-type-return ty)))
-          (if ret-type (resolve-type ret-type env) (unit-type)))
+          (if ret-type (resolve-type ret-type env) unit-type))
          (error 'type-of "Tried to call an expression of non function type"))))
-   ((math op left right) (int-type))
+   ((math op left right) int-type)
    ((create-record type fields) (resolve-type type env))
    ((create-array type size value) (resolve-type type env))
-   ((while-loop guard body) (unit-type))
-   ((for-loop id init final body) (unit-type))
-   ((break) (unit-type))))
+   ((while-loop guard body) unit-type)
+   ((for-loop id init final body) unit-type)
+   ((break) unit-type)))
 
 
  
@@ -473,7 +476,7 @@
  (define (lookup-identifier-type sym env)
   (hash-ref (type-environment-ids env) sym
    (lambda ()
-    (error 'lookup-identifier "Unbound Identifier ~a" sym))))
+    (error 'lookup-identifier "Unbound Identifier ~a in ~a" sym env))))
 
  (: resolve-type* (type-environment -> (type-reference -> value-type)))
  (define (resolve-type* env)
