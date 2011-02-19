@@ -227,12 +227,16 @@
          (error "Already annotated equality: ~a" prog)
          (let-values (((left l-type) (recur left))
                       ((right r-type) (recur right)))
-          (let ((res-type
+          (let: ((res-type : value-type
                  (cond
                   ((and (equal? 'nil l-type) (equal? 'nil r-type))
                    (error 'type-check "Both sides of equality are nil ~a" prog))
                   ((and (equal? 'nil l-type) (record-type? r-type)) r-type)
                   ((and (equal? 'nil r-type) (record-type? l-type)) l-type)
+                  ((or (equal? 'nil l-type) (equal? 'nil r-type))
+                   (error 'type-check "One side of equality is nil and other isn't a record ~a" prog))
+                  ((or (unit-type? l-type) (unit-type? r-type))
+                   (error 'type-check "At least one side of equality is unit typed ~a" prog))
                   ((not (equal? l-type r-type))
                    (error 'type-check "Type ~a and ~a cannot be compared" l-type r-type))
                   (else r-type))))
@@ -394,6 +398,8 @@
            (error 'nil-annotate "Tried to call an expression of non function type"))))
      ((math op left right)
       (math op (recur left) (recur right)))
+     ((equality op left right ty)
+      (equality op (recur left) (recur right) ty))
      ((create-record type fields)
       (let ((rtype (resolve-type type env)))
        (if (record-type? rtype)

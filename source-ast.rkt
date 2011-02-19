@@ -16,6 +16,7 @@
     negation
     function-call
     math
+    equality
     create-record
     create-array
     while-loop

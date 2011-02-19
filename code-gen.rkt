@@ -16,6 +16,10 @@
 
 (define (add-external-functions)
 
+
+ (let ((i8* (llvm-ptr-type (llvm-int8-type))))
+  (llvm-add-function (llvm-fun-type i8* i8* i8* (llvm-int-type)) "memcpy"))
+
  (define (make-closure funval type name)
   (define closure  (llvm-add-global (closure-type type 0) name))
   (llvm-set-initializer
@@ -166,8 +170,6 @@
 
 
 
-  (let ((i8* (llvm-ptr-type (llvm-int8-type))))
-   (llvm-add-function (llvm-fun-type i8* i8* i8* (llvm-int-type)) "memcpy"))
 
   (define ext-functions (add-external-functions))
   (define function-descriptions (lifted-program-functions prog))
@@ -371,7 +373,14 @@
    ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
+   ((equality-primop equal type) (compile-equality-test equal type (first vals) (second vals)))
    (else (error 'compile-primop "Unsupported primop: ~a" op))))
+
+ (define (compile-equality-test equal type v1 v2)
+  (cond
+   ((int-type? type) (llvm-zext ((if equal llvm-= llvm-/=) v1 v2) (llvm-int-type)))
+   (else (error 'compile-equality-test "Not yet implemented"))))
+
 
  (define (compile-create-record type vals)
   (let ((mem (llvm-malloc (llvm-get-element-type type))))
