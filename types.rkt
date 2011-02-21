@@ -48,6 +48,7 @@
  record-type-field-type
  record-type-field-index
  make-function-type
+ make-box-type
  (rename-out
   (function-type-return-type* function-type-return-type)
   (function-type-arg-types* function-type-arg-types)
@@ -297,6 +298,9 @@
 
 (: make-function-type ((Listof type) type -> function-type))
 (define make-function-type function-type)
+
+(: make-box-type (type -> box-type))
+(define make-box-type box-type)
  
 
 

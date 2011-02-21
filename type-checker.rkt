@@ -179,7 +179,7 @@
      (let-values (((value v-type) (recur value))
                   ((expr e-type) (recur expr)))
       (if (equal? v-type e-type)
-          (values (assignment value expr) e-type)
+          (values (assignment value expr) unit-type)
           (error 'type-check "Assignment to ~a of type ~a is of different type than ~a of type ~a"
            value v-type expr e-type))))
     ((if-then-else c t f ty)

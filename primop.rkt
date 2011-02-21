@@ -13,10 +13,13 @@
     string-constant-primop
     nil-primop
     runtime-primop
+    box-set!-primop
     array-set!-primop
+    field-set!-primop
+    box-ref-primop
     array-ref-primop
     field-ref-primop
-    field-set!-primop
+    create-box-primop
     create-array-primop
     create-record-primop
     equality-primop
@@ -33,11 +36,16 @@
 (define-struct: nil-primop ((type : type)) #:transparent)
 (define-struct: runtime-primop ((type : type) (name : Symbol)) #:transparent)
 
+(define-struct: box-set!-primop ((type : box-type)) #:transparent)
+(define-struct: box-ref-primop ((type : box-type)) #:transparent)
 (define-struct: array-set!-primop ((type : array-type)) #:transparent)
 (define-struct: array-ref-primop ((type : array-type)) #:transparent)
+
+
 (define-struct: field-ref-primop ((type : record-type) (field : Symbol)) #:transparent)
 (define-struct: field-set!-primop ((type : record-type) (field : Symbol)) #:transparent)
 
+(define-struct: create-box-primop ((type : box-type)) #:transparent)
 (define-struct: create-record-primop ((type : record-type)) #:transparent)
 (define-struct: create-array-primop ((type : array-type)) #:transparent)
 

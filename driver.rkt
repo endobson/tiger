@@ -2,7 +2,7 @@
 
 (require (for-syntax racket/base))
 
-(require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt" "fix-loops.rkt")
+(require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt" "fix-loops.rkt" "fix-assignment.rkt")
 
 (require "lifter.rkt" "code-gen.rkt")
 
@@ -44,10 +44,11 @@
    (lift
     (inter->ir:transform
      (fix-loops
-      (source->inter:transform 
-       checked-program
-       source->inter:global-env
-       source->inter:global-type-env)))))))
+      (remove-assignment
+       (source->inter:transform 
+        checked-program
+        source->inter:global-env
+        source->inter:global-type-env))))))))
 
 (define (compile-llvm program exe-path-string)
  (define exe-path 

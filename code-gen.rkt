@@ -237,6 +237,7 @@
          ((int-type? type) (llvm-int-type))
          ((unit-type? type) (llvm-void-type))
          ((string-type? type) (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) 0)) #f)))
+         ((box-type? type) (llvm-ptr-type (convert (box-type-elem-type type)))) 
          ((function-type? type)
           (let ((arg-types (map convert (function-type-arg-types type)))
                 (return-type (convert (function-type-return-type type))))
@@ -365,12 +366,18 @@
    ((string-constant-primop val) (compile-string-constant val))
    ((nil-primop type) (llvm-null (convert-type type)))
    ((create-record-primop type) (compile-create-record (convert-type type) vals))
+   ((create-box-primop type) (compile-create-box (convert-type type) (first vals)))
    ((create-array-primop type) (compile-create-array
                                  (convert-type (array-type-elem-type type))
                                  (first vals)
                                  (second vals)))
    ((field-ref-primop type name) (compile-field-ref type name (first vals)))
+   ((box-ref-primop type) (compile-box-ref type (first vals)))
    ((array-ref-primop type) (compile-array-ref type (first vals) (second vals)))
+
+   ((box-set!-primop type) (compile-box-set! type (first vals) (second vals)))
+
+
    ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
@@ -409,6 +416,17 @@
    (for ((i (in-range size)))
     (llvm-store val (llvm-gep mem 0 i)))
    mem))
+
+ (define (compile-create-box type val)
+  (let ((mem (llvm-malloc (llvm-get-element-type type))))
+   (llvm-store val mem)
+   mem))
+
+ (define (compile-box-ref type mem)
+  (llvm-load mem))
+
+ (define (compile-box-set! type mem val)
+  (llvm-store val mem))
 
 
  (define (compile-array-ref type array index)
