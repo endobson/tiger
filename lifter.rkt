@@ -34,8 +34,8 @@
   (match prog
    ((ir:identifier sym) (list sym))
    ((ir:sequence first next) (append (recur first) (recur next)))
-   ((ir:conditional c t f)
-    (append (recur c) (recur t) (if f (recur f) empty)))
+   ((ir:conditional c t f ty)
+    (append (recur c) (recur t) (recur f)))
    ((ir:primop-expr op args)
     (append-map recur args))
    ((ir:bind v ty expr body)
@@ -120,12 +120,12 @@
     (let*-values (((first env) (lift first id-env env))
                   ((rest env) (lift rest id-env env)))
      (values (lifted:sequence first rest) env)))
-   ((ir:conditional cond t-branch f-branch)
+   ((ir:conditional cond t-branch f-branch ty)
     (let*-values 
       (((cond env) (lift cond id-env env))
        ((t-branch env) (lift t-branch id-env env))
        ((f-branch env) (lift f-branch id-env env)))
-     (values (lifted:conditional cond t-branch f-branch) env)))
+     (values (lifted:conditional cond t-branch f-branch ty) env)))
    (else (error 'lift "Not yet implemented ~a" expr))))
 
  (let-values (((expr env)

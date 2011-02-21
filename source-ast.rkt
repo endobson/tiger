@@ -44,7 +44,8 @@
 (define-struct: if-then-else
                  ((cond : expression)
                   (true : expression)
-                  (false : (U #f expression))))
+                  (false : (U #f expression))
+                  (type : (U #f 'nil 'unit type-reference))))
 
 
 

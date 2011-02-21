@@ -57,12 +57,12 @@
    ((for-loop id init final body)
     (error 'cps "Unremoved for-loop"))
    ((break) (primop-expr (unit-primop) empty))
-   ((conditional c t f)
+   ((conditional c t f ty)
     (let* ((fun-name (gensym 'cps-fun))
            (cont-name (gensym 'cont-cond-fun))
            (val-name (gensym 'condition-val))
            (cont-val-name (gensym 'cont-val))
-           (expr-type (type-of t env))
+           (expr-type ty)
            (env (hash-set (hash-set env fun-name (continuation-type int-type)) cont-name (continuation-type expr-type))))
      (bind-rec (list (cons fun-name
                            (function
@@ -116,7 +116,8 @@
                                                (identifier var))))))))
                           (conditional (primop-expr (equality-primop #t int-type) (list (identifier var) (identifier final-name)))
                             (cps body (identifier cont-name) env)
-                            (primop-expr (unit-primop) empty))))))
+                            (primop-expr (unit-primop) empty)
+                            unit-type)))))
        (primop-expr (call-closure-primop) (list (identifier init-name))))))))))
 
 (: fix-while-loop (while-loop type-environment -> expression))
@@ -129,7 +130,8 @@
                       unit-type
                       (conditional cond
                        (cps body (identifier fun-name) env)
-                       (primop-expr (unit-primop) empty)))))
+                       (primop-expr (unit-primop) empty)
+                       unit-type))))
      (primop-expr (call-closure-primop) (list (identifier fun-name) (primop-expr (unit-primop) empty))))))))
 
 (: fix-loops-top (expression -> expression))
@@ -168,8 +170,8 @@
      (fix-loops final env)
      (fix-loops body (hash-set env id int-type))) env))
   ((break) expr)
-  ((conditional c t f)
-   (conditional (fix-loops c env) (fix-loops t env) (fix-loops f env)))
+  ((conditional c t f ty)
+   (conditional (fix-loops c env) (fix-loops t env) (fix-loops f env) ty))
   ((primop-expr op exprs)
    (primop-expr op (map (lambda: ((e : expression)) (fix-loops e env)) exprs)))))
                       

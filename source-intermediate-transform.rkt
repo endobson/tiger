@@ -112,10 +112,17 @@
               (inter:primop-expr (array-ref-primop r-type) (list (recur base) (recur index)))
               (error 'transform "Array-reference of non array-type")))
          (error 'transform "Untyped array-ref")))
-    ((source:if-then-else c t f)
-     (if f
-         (inter:conditional (recur c) (recur t) (recur f))
-         (error 'transform "One armed if remains")))
+    ((source:if-then-else c t f ty)
+     (if ty
+         (if f
+             (let ((r-type 
+                    (cond 
+                     ((equal? 'nil ty) (error 'transform "Nil typed if remains"))
+                     ((equal? 'unit ty) inter:unit-type)
+                     (else (lookup-type-reference ty type-env)))))
+              (inter:conditional (recur c) (recur t) (recur f) r-type))
+             (error 'transform "One armed if remains"))
+         (error 'transform "Unannotated if remains")))
     ((source:create-record type fields)
      (let ((r-type (lookup-type-reference type type-env)))
       (if (inter:record-type? r-type)

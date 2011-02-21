@@ -24,7 +24,7 @@
 
 (struct: identifier  ((name : Symbol)))
 (struct: primop-expr ((rator : primop) (args : (Listof expression))))
-(struct: conditional ((condition : expression) (t-branch : expression) (f-branch : expression)))
+(struct: conditional ((condition : expression) (t-branch : expression) (f-branch : expression) (type : type)))
 (struct: bind        ((name : Symbol) (type : type) (expr : expression) (body : expression)))
 (struct: bind-rec    ((functions : (Listof (Pair Symbol create-closure))) (body : expression)))
 (struct: sequence    ((first : expression) (next : expression)))

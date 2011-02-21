@@ -313,7 +313,7 @@
       (compile-primop op vals)))
     ((sequence first rest)
      (recur first) (recur rest))
-    ((conditional c t f)
+    ((conditional c t f ty)
      (let ((cv (recur c)))
       (let ((cond (llvm-/= cv 0)))
        (define-basic-block t-block f-block m-block)
@@ -321,7 +321,7 @@
        (let ((tv (begin (llvm-set-position t-block) (begin0 (recur t) (llvm-br m-block))))
              (fv (begin (llvm-set-position f-block) (begin0 (recur f) (llvm-br m-block)))))
         (llvm-set-position m-block)
-        (let ((merged (llvm-phi (llvm-int-type))))
+        (let ((merged (llvm-phi (convert-type ty))))
          (llvm-add-incoming merged (cons tv t-block) (cons fv f-block))
          merged)))))
     ((bind-rec funs body)
@@ -362,6 +362,7 @@
   (match op
    ((math-primop sym) (compile-math sym (first vals) (second vals)))
    ((integer-constant-primop val) val)
+   ((string-constant-primop val) (compile-string-constant val))
    ((nil-primop type) (llvm-null (convert-type type)))
    ((create-record-primop type) (compile-create-record (convert-type type) vals))
    ((create-array-primop type) (compile-create-array
@@ -375,6 +376,17 @@
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
    ((equality-primop equal type) (compile-equality-test equal type (first vals) (second vals)))
    (else (error 'compile-primop "Unsupported primop: ~a" op))))
+
+
+
+ (define (compile-string-constant str)
+  (define str-length (string-length str))
+  (define (llvm-str-type n) (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) n)) #f))
+  (define llvm-str (llvm-add-global (llvm-str-type str-length)""))
+  (llvm-set-initializer llvm-str
+    (LLVMConstStructInContext (current-context) (list (llvm-int str-length) (LLVMConstStringInContext (current-context) str #t)) #f))
+  (llvm-bit-cast llvm-str (convert-type string-type)))
+  
 
  (define (compile-equality-test equal type v1 v2)
   (cond
