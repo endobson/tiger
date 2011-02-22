@@ -68,6 +68,29 @@
         (error 'resolve-type "Unbound type name ~a in ~a" sym env))))
      type))
 
+(: type-equal? ((U type-reference type 'nil) (U type-reference type 'nil) type-environment -> Boolean))
+(define (type-equal? t1 t2 env)
+ (cond
+  ((type-reference? t1) (type-equal? (resolve-type t1 env) t2 env))
+  ((type-reference? t2) (type-equal? t1 (resolve-type t2 env) env))
+  ((equal? 'nil t1) (equal? 'nil t2))
+  ((unit-type? t1) (unit-type? t2))
+  ((int-type? t1) (int-type? t2))
+  ((string-type? t1) (string-type? t2))
+  ((array-type? t1) (equal? t1 t2))
+  ((record-type? t1) (equal? t1 t2))
+  ((function-type? t1)
+   (and (function-type? t2)
+    (match t1
+     ((function-type args1 return1)
+      (match t2
+       ((function-type args2 return2)
+        (and
+         (if return1 (and return2 (type-equal? return1 return2 env))
+             (not return2))
+         (= (length args1) (length args2))
+         (andmap (lambda: ((arg1 : (U type-reference type)) (arg2 : (U type type-reference))) (type-equal? arg1 arg2 env)) args1 args2))))))))))
+
 
 
 
@@ -140,14 +163,14 @@
      (values prog (lookup-identifier-type sym env)))
     ((field-ref base field ty)
      (let-values (((base type) (recur base)))
-      (if (if ty (equal? (resolve-type ty env) type) #t)
+      (if (if ty (type-equal? ty type env) #t)
           (if (and (record-type? type) (record-type-has-field? type field) )
               (values (field-ref base field (unresolve-type type env)) (resolve-type (record-field-type type field) env))
               (error 'type-check "Expression ~a of type ~a has no field ~a" base type field))
           (error 'type-check "Annotated type ~a does not match actual type ~a" ty type))))
     ((array-ref base index ty)
      (let-values (((base a-type) (recur base)))
-      (if (if ty (equal? (resolve-type ty env) a-type) #t)
+      (if (if ty (type-equal? ty a-type env) #t)
           (if (array-type? a-type)
            (let-values (((index i-type) (recur index)))
             (if (int-type? i-type)
@@ -178,7 +201,7 @@
     ((assignment value expr)
      (let-values (((value v-type) (recur value))
                   ((expr e-type) (recur expr)))
-      (if (equal? v-type e-type)
+      (if (type-equal? v-type e-type env)
           (values (assignment value expr) unit-type)
           (error 'type-check "Assignment to ~a of type ~a is of different type than ~a of type ~a"
            value v-type expr e-type))))
@@ -189,7 +212,7 @@
        (if (int-type? c-type)
         (let-values (((t t-type) (recur t))
                      ((f f-type) (if f (recur f) (values (sequence empty) unit-type))))
-         (if (equal? t-type f-type)
+         (if (type-equal? t-type f-type env)
              (let ((r-type 
                     (cond
                      ((equal? t-type 'nil) 'nil)
@@ -217,8 +240,10 @@
       (let-values (((fun fun-type) (recur fun)) ((args arg-types) (map2 recur args)))
        (match fun-type
         ((function-type fun-arg-types fun-return-type)
-          (if (equal? (map maybe-resolve-type fun-arg-types)
-                      arg-types)
+          (if (and (= (length fun-arg-types) (length arg-types))
+                   (andmap (lambda: ((t1 : (U type-reference type)) (t2 : pos-type)) (type-equal? t1 t2 env))
+                                       fun-arg-types
+                                       arg-types))
               (let ((fun-type-name (gensym 'fun-type)))
                (values (binder (list (type-declaration fun-type-name (function-type fun-arg-types fun-return-type)))
                                (function-call fun args (type-reference fun-type-name)))
@@ -264,7 +289,7 @@
             (expr-expr (cdr expr-pair)))
        (if (equal? type-field-name expr-field-name)
            (let-values (((expr e-type) (recur expr-expr)))
-            (if (or (equal? 'nil e-type) (equal? e-type (resolve-type type-type env)))
+            (if (or (equal? 'nil e-type) (type-equal? e-type type-type env))
                 (cons expr-field-name expr)
                 (error 'type-check "The field expression ~a has type ~a instead of ~a" expr e-type type-type)))
            (error 'type-check "The field name is ~a and should be ~a" expr-field-name type-field-name))))
@@ -279,7 +304,7 @@
                   ((a-type) (resolve-type type env)))
       (if (array-type? a-type)
           (if (int-type? s-type)
-              (if (equal? v-type (resolve-type (array-type-elem-type a-type) env))
+              (if (type-equal? v-type (array-type-elem-type a-type) env)
                   (values (create-array type size value) a-type)
                   (error 'type-check "Inital value ~a in array creation has type ~a which does not match array type ~a"
                     value v-type a-type))
@@ -551,7 +576,7 @@
       ((variable-declaration name type value)
        (let-values (((value v-type) ((type-check env) value)))
         (let ((r-type (resolve-type type env)))
-        (if (equal? r-type v-type)
+        (if (type-equal? r-type v-type env)
             (let-values (((decs env) (extend-environment (rest decs) (add-identifier name r-type env))))
              (values (cons (variable-declaration name type value) decs) env))
             (error 'type-check "Variable declaration type ~a does not match type of expression ~a" type v-type)))))
@@ -583,7 +608,7 @@
       ((function-declaration name args type body)
        (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
         (let-values (((body b-type) ((type-check (add-identifiers args-typed env)) body)))
-         (if (if type (equal? b-type (resolve-type type env))
+         (if (if type (type-equal? b-type type env)
                  (unit-type? b-type))
              (function-declaration name args type body)
              (error 'type-check "Bad function declaration body, should have type ~a has type ~a" type b-type)))))))
@@ -595,6 +620,27 @@
  (: check-type-declarations ((Listof type-declaration) type-environment -> (values (Listof type-declaration) type-environment)))
  (define (check-type-declarations types env)
   (define-type dag (HashTable Symbol (U Symbol #f)))
+
+  (: simplify-function-types ((Listof type-declaration) -> (Listof type-declaration)))
+  (define (simplify-function-types types)
+   (if (empty? types) empty
+    (let ((type (first types)) (types (rest types)))
+     (match type
+      ((type-declaration name ty)
+       (match ty
+        ((function-type args return-type)
+         (let ((return-name (gensym 'return))
+               (arg-names (map (lambda (_) (gensym 'arg)) args)))
+          (: add-return ((Listof type-declaration) -> (Listof type-declaration)))
+          (define (add-return decls)
+           (if return-type (cons (type-declaration return-name return-type) decls) decls))
+          (cons (type-declaration name (function-type (map type-reference arg-names)
+                                                      (and return-type (type-reference return-name))))
+           (simplify-function-types (add-return
+            (append (map type-declaration arg-names args) types))))))
+        (else (cons type (simplify-function-types types)))))))))
+
+
   (: compute-reference-dag ((Listof type-declaration) dag -> dag))
   (define (compute-reference-dag types dag)
    (cond
@@ -650,7 +696,8 @@
 
    
 
-  (let* ((reference-dag (compute-reference-dag types (make-immutable-hash empty)))
+  (let* ((types (simplify-function-types types))
+         (reference-dag (compute-reference-dag types (make-immutable-hash empty)))
          (cycle 
           (for/fold: : Boolean
            ((result : Boolean #f))
