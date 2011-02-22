@@ -200,7 +200,8 @@
                     (llvm-int-to-ptr
                      (llvm-load (llvm-gep (llvm-get-param 0) 0 1 i))
                      (convert-type arg-type))))))
-       (llvm-ret (compile-expr env info-env all-functions body)))))))
+       (let ((val (compile-expr env info-env all-functions body)))
+        (if val (llvm-ret val) (LLVMBuildRetVoid (current-builder)))))))))
 
 
 
@@ -322,9 +323,11 @@
        (let ((tv (begin (llvm-set-position t-block) (begin0 (recur t) (llvm-br m-block))))
              (fv (begin (llvm-set-position f-block) (begin0 (recur f) (llvm-br m-block)))))
         (llvm-set-position m-block)
-        (let ((merged (llvm-phi (convert-type ty))))
-         (llvm-add-incoming merged (cons tv t-block) (cons fv f-block))
-         merged)))))
+        (if (unit-type? ty)
+            #f
+            (let ((merged (llvm-phi (convert-type ty))))
+              (llvm-add-incoming merged (cons tv t-block) (cons fv f-block))
+              merged))))))
     ((bind-rec funs body)
      (define closure-names (map car funs))
      (define fun-names (map (compose create-closure-function cdr) funs))
@@ -365,6 +368,7 @@
    ((integer-constant-primop val) val)
    ((string-constant-primop val) (compile-string-constant val))
    ((nil-primop type) (llvm-null (convert-type type)))
+   ((unit-primop) #f)
    ((create-record-primop type) (compile-create-record (convert-type type) vals))
    ((create-box-primop type) (compile-create-box (convert-type type) (first vals)))
    ((create-array-primop type) (compile-create-array
@@ -378,7 +382,7 @@
    ((box-set!-primop type) (compile-box-set! type (first vals) (second vals)))
 
 
-   ((call-closure-primop) (compile-closure-call (first vals) (rest vals)))
+   ((call-closure-primop ty) (compile-closure-call (first vals) (rest vals)))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
    ((equality-primop equal type) (compile-equality-test equal type (first vals) (second vals)))
@@ -397,7 +401,9 @@
 
  (define (compile-equality-test equal type v1 v2)
   (cond
-   ((int-type? type) (llvm-zext ((if equal llvm-= llvm-/=) v1 v2) (llvm-int-type)))
+   ((or (int-type? type) (box-type? type) (array-type? type) (record-type? type))
+    (llvm-zext ((if equal llvm-= llvm-/=) v1 v2) (llvm-int-type)))
+    
    (else (error 'compile-equality-test "Not yet implemented"))))
 
 

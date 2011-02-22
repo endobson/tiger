@@ -1,6 +1,8 @@
 #lang typed/racket/base
 
-(require racket/match racket/list)
+(require racket/match racket/list )
+
+
 (require
          (prefix-in lifted: "lifted-ast.rkt")
          (prefix-in ir: "ir-ast.rkt")
@@ -44,11 +46,12 @@
     (let ((fun-names (map (inst car Symbol ir:function) functions))
           (funs (map (inst cdr Symbol ir:function) functions)))
      (remove-all fun-names
-      (append-map (lambda: ((f : ir:function))
-       (match f
-        ((ir:function args ty body)
-         (remove-all (map (inst car Symbol type) args)
-                     (recur body))))) funs))))))
+      (append (recur body)
+       (append-map (lambda: ((f : ir:function))
+        (match f
+         ((ir:function args ty body)
+          (remove-all (map (inst car Symbol type) args)
+                      (recur body))))) funs)))))))
  (recur expr))
        
 
@@ -70,7 +73,7 @@
    ((ir:identifier x) (values (lifted:identifier x) env))
    ((ir:bind var type expr body)
     (let*-values (((expr env) (lift expr id-env env))
-                  ((body env) (lift body id-env env)))
+                  ((body env) (lift body (hash-set id-env var type) env)))
      (values (lifted:bind var type expr body) env)))
    ((ir:bind-rec closure-decs body)
     (let ((id-env
@@ -103,7 +106,7 @@
                     (make-function-type arg-types ty)
                     arg-names
                     free-vars
-                    (map (lambda: ((s : Symbol)) (hash-ref id-env s)) free-vars)
+                    (map (lambda: ((s : Symbol)) (hash-ref id-env s (lambda () (error 'lift "Cannot find free-variable ~a in ~a" s id-env)))) free-vars)
                     body)
                    env)))))))))))
           (values (lifted:bind-rec closures body) env)))))

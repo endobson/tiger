@@ -8,11 +8,37 @@
 
 (define-type type-environment (HashTable Symbol type))
 (: type-of (expression type-environment -> type))
-(define (type-of expression env)
- (match expression))
+(define (type-of expr env)
+ (match expr 
+  ((identifier id) (hash-ref env id (lambda () (error 'cps "Unbound identifier ~a in ~a" id env))))
+  ((primop-expr op args) 
+   (match op
+    ((call-closure-primop ty) (function-type-return-type ty))
+    ((math-primop sym) int-type)
+    ((equality-primop eql type) int-type)
+    ((unit-primop) unit-type)
+    ((integer-constant-primop val) int-type)
+    ((string-constant-primop val) string-type) 
+    ((nil-primop ty) ty)
+    ((runtime-primop ty name) ty) 
+    ((box-set!-primop ty) unit-type)
+    ((array-set!-primop ty) unit-type) 
+    ((field-set!-primop ty field) unit-type)
+
+    ((box-ref-primop ty) (box-type-elem-type ty)) 
+    ((array-ref-primop ty) (array-type-elem-type ty))
+    ((field-ref-primop ty field) (record-type-field-type ty field))
+    
+    ((create-box-primop ty) ty)
+    ((create-record-primop ty) ty)
+    ((create-array-primop ty) ty) 
+
+    (else (error 'type-of "Not yet implemented primop ~a" op))))
+  
+  (else (error 'type-of "Not yet implemented ~a" expr))))
  
 
-(: continuation-type (type -> type))
+(: continuation-type (type -> function-type))
 (define (continuation-type ty)
  (make-function-type (list ty) unit-type))
 
@@ -28,11 +54,12 @@
 (define (function->type fun)
  (make-function-type (map (inst cdr Symbol type) (function-args fun)) (function-return-type fun)))
 
-(: app (expression expression -> expression))
+(: app (continuation expression -> expression))
 (define (app k val)
- (primop-expr (call-closure-primop) (list k val)))
+ (primop-expr (call-closure-primop (continuation-ty k)) (list (continuation-expr k) val)))
 
-(define-type continuation expression)
+(define-struct: continuation ((expr : expression) (ty : function-type)))
+
 (: cps (expression continuation type-environment -> expression))
 (define (cps expr cont env)
  ;Not needed inner version. Maybe useful for extensions
@@ -44,7 +71,7 @@
      (bind-rec
       (list (cons fun-name (function (list (cons v ty)) unit-type
                                      (cps body cont (hash-set env v ty)))))
-      (cps expr (identifier fun-name) env))))
+      (cps expr (continuation (identifier fun-name) (continuation-type ty)) env))))
    ((bind-rec funs body)
     (bind-rec funs (cps body cont (add-function-types funs env))))
    ((sequence e1 e2)
@@ -68,24 +95,25 @@
                            (function
                             (list (cons val-name int-type))
                             unit-type
-                            (primop-expr (call-closure-primop) (list
-                              (if val-name (cps t (identifier cont-name) (hash-set env val-name int-type))
-                                           (cps f (identifier cont-name) (hash-set env val-name int-type)))))))
+                            (if val-name (cps t (continuation (identifier cont-name) (continuation-type ty))
+                                                (hash-set env val-name int-type))
+                                         (cps f (continuation (identifier cont-name) (continuation-type ty))
+                                                (hash-set env val-name int-type)))))
                      (cons cont-name
                            (function
                             (list (cons cont-val-name expr-type))
                             unit-type
                             (app cont (identifier cont-val-name)))))
-      (cps c (identifier fun-name) env))))
+      (cps c (continuation (identifier fun-name) (continuation-type int-type)) env))))
   ((primop-expr op exprs)
    (let ((names (map (lambda: ((e : expression)) (gensym 'primop-arg)) exprs)))
     (for/fold: : expression
      ((final-expr : expression (app cont (primop-expr op (map identifier names)))))
      ((name : Symbol (reverse names))
       (expr : expression (reverse exprs)))
-     (let ((fun-name (gensym 'cps-fun)))
-      (bind-rec (list (cons fun-name (function (list (cons name (type-of expr env))) unit-type cont)))
-       (cps expr (identifier fun-name) env))))))))
+     (let ((fun-name (gensym 'cps-fun)) (e-type (type-of expr env)))
+      (bind-rec (list (cons fun-name (function (list (cons name e-type)) unit-type (continuation-expr cont))))
+       (cps expr (continuation (identifier fun-name) (continuation-type e-type)) env))))))))
 
         
  (cps expr cont env)) 
@@ -107,7 +135,7 @@
                         (bind-rec (list (cons cont-name 
                                          (function (list (cons (gensym 'ignored) unit-type))
                                           unit-type
-                                          (primop-expr (call-closure-primop)
+                                          (primop-expr (call-closure-primop (continuation-type int-type))
                                            (list
                                             (identifier fun-name)
                                             (primop-expr (math-primop '+)
@@ -115,10 +143,10 @@
                                                (primop-expr (integer-constant-primop 1) empty)
                                                (identifier var))))))))
                           (conditional (primop-expr (equality-primop #t int-type) (list (identifier var) (identifier final-name)))
-                            (cps body (identifier cont-name) env)
+                            (cps body (continuation (identifier cont-name) (continuation-type unit-type)) (hash-set env var int-type))
                             (primop-expr (unit-primop) empty)
                             unit-type)))))
-       (primop-expr (call-closure-primop) (list (identifier init-name))))))))))
+       (primop-expr (call-closure-primop (continuation-type int-type)) (list (identifier fun-name) (identifier init-name))))))))))
 
 (: fix-while-loop (while-loop type-environment -> expression))
 (define (fix-while-loop loop env)
@@ -129,10 +157,10 @@
                      (function (list (cons (gensym 'ignored) unit-type))
                       unit-type
                       (conditional cond
-                       (cps body (identifier fun-name) env)
+                       (cps body (continuation (identifier fun-name) (continuation-type unit-type)) env)
                        (primop-expr (unit-primop) empty)
                        unit-type))))
-     (primop-expr (call-closure-primop) (list (identifier fun-name) (primop-expr (unit-primop) empty))))))))
+     (primop-expr (call-closure-primop (continuation-type unit-type)) (list (identifier fun-name) (primop-expr (unit-primop) empty))))))))
 
 (: fix-loops-top (expression -> expression))
 (define (fix-loops-top expr) (fix-loops expr (make-immutable-hash empty)))

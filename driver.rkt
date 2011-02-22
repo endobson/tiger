@@ -2,14 +2,14 @@
 
 (require (for-syntax racket/base))
 
-(require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt" "fix-loops.rkt" "fix-assignment.rkt")
+(require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt" "fix-loops.rkt" "fix-assignment.rkt" "fix-units.rkt")
 
 (require "lifter.rkt" "code-gen.rkt")
 
 (require (prefix-in source->inter: "source-intermediate-transform.rkt"))
 (require (prefix-in inter->ir: "intermediate-ir-transform.rkt"))
 
-(require racket/file racket/system)
+(require racket/file racket/system racket/pretty)
 
 (provide full-compile compile-llvm)
 
@@ -37,18 +37,25 @@
    ast)))
 
 
+(define (simplify ast)
+ (remove-units
+  (inter->ir:transform
+   (fix-loops
+     (remove-assignment
+      (source->inter:transform 
+       ast
+       source->inter:global-env
+       source->inter:global-type-env))))))
+
 
 (define (full-compile s/p)
- (let ((checked-program (check-semantics (parse s/p))))
-  (compile-program
-   (lift
-    (inter->ir:transform
-     (fix-loops
-      (remove-assignment
-       (source->inter:transform 
-        checked-program
-        source->inter:global-env
-        source->inter:global-type-env))))))))
+ (let* ((checked-program (check-semantics (parse s/p)))
+        (simple-program (simplify checked-program))
+        ;(_ (pretty-write simple-program))
+        (lifted-program (lift simple-program))
+        (_ (pretty-write lifted-program))
+        (compiled-program (compile-program lifted-program)))
+  compiled-program))
 
 (define (compile-llvm program exe-path-string)
  (define exe-path 
