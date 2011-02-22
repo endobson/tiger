@@ -251,6 +251,7 @@
          ((unit-type? type) (llvm-void-type))
          ((string-type? type) (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) 0)) #f)))
          ((box-type? type) (llvm-ptr-type (convert (box-type-elem-type type)))) 
+         ((array-type? type) (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (convert (array-type-elem-type type)) 0)) #f)))
          ((function-type? type)
           (let ((arg-types (map convert (function-type-arg-types type)))
                 (return-type (convert (function-type-return-type type))))
@@ -302,6 +303,10 @@
  (let ((string (llvm-array-malloc (llvm-int8-type) (llvm+ 4 size))))
   (llvm-bit-cast string (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) 0)) #f)))))
 
+(define (llvm-alloc-array type size)
+ (let ((array (llvm-array-malloc type (llvm+ 1 size))))
+  (llvm-bit-cast array (llvm-ptr-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType type 0)) #f)))))
+
   
   
 
@@ -311,6 +316,7 @@
   ((unit-type? type) value)
   ((function-type? type) (llvm-ptr-to-int value))
   ((box-type? type) (llvm-ptr-to-int value))
+  ((array-type? type) (llvm-ptr-to-int value))
   (else (error 'int-cast "Unsupported-type ~a" type))))
 
 
@@ -334,12 +340,14 @@
        (define-basic-block t-block f-block m-block)
        (llvm-cond-br cond t-block f-block)
        (let ((tv (begin (llvm-set-position t-block) (begin0 (recur t) (llvm-br m-block))))
-             (fv (begin (llvm-set-position f-block) (begin0 (recur f) (llvm-br m-block)))))
+             (tfinal-block (LLVMGetInsertBlock (current-builder)))
+             (fv (begin (llvm-set-position f-block) (begin0 (recur f) (llvm-br m-block))))
+             (ffinal-block (LLVMGetInsertBlock (current-builder))))
         (llvm-set-position m-block)
         (if (unit-type? ty)
             #f
             (let ((merged (llvm-phi (convert-type ty))))
-              (llvm-add-incoming merged (cons tv t-block) (cons fv f-block))
+              (llvm-add-incoming merged (cons tv tfinal-block) (cons fv ffinal-block))
               merged))))))
     ((bind-rec funs body)
      (define closure-names (map car funs))
@@ -391,6 +399,7 @@
    ((field-ref-primop type name) (compile-field-ref type name (first vals)))
    ((box-ref-primop type) (compile-box-ref type (first vals)))
    ((array-ref-primop type) (compile-array-ref type (first vals) (second vals)))
+   ((array-set!-primop type) (compile-array-set! type (first vals) (second vals) (third vals)))
 
    ((box-set!-primop type) (compile-box-set! type (first vals) (second vals)))
 
@@ -431,25 +440,29 @@
 
 
  (define (compile-create-array type size val)
-  (let ((mem (llvm-bit-cast (llvm-array-malloc type size) (llvm-ptr-type (LLVMArrayType type 0)))))
-   (for ((i (in-range size)))
-    (llvm-store val (llvm-gep mem 0 i)))
-   mem))
+  (let ((mem (llvm-alloc-array type size)))
+    (llvm-store size (llvm-gep mem 0 0))
+    (for ((i (in-range size)))
+         (llvm-store val (llvm-gep mem 0 1 i)))
+    mem))
 
  (define (compile-create-box type val)
-  (let ((mem (llvm-malloc (llvm-get-element-type type))))
-   (llvm-store val mem)
-   mem))
+   (let ((mem (llvm-malloc (llvm-get-element-type type))))
+     (llvm-store val mem)
+     mem))
 
  (define (compile-box-ref type mem)
-  (llvm-load mem))
+   (llvm-load mem))
 
  (define (compile-box-set! type mem val)
-  (llvm-store val mem))
+   (llvm-store val mem))
 
 
  (define (compile-array-ref type array index)
-  (llvm-load (llvm-gep array 0 index)))
+   (llvm-load (llvm-gep array 0 1 index)))
+
+ (define (compile-array-set! type array index val)
+   (llvm-store val (llvm-gep array 0 1 index)))
 
 
 
@@ -457,26 +470,29 @@
 
 
  (define (compile-math op l r)
-  (define (up-convert x)
-   (llvm-zext x (llvm-int-type)))
-  (define (down-convert x y)
-   (values
-    (llvm-/= x 0)
-    (llvm-/= y 0)))
-  (define ((wrap f) . args)
-   (apply f args))
+   (define (up-convert x)
+     (llvm-zext x (llvm-int-type)))
+   (define (down-convert x y)
+     (values
+       (llvm-/= x 0)
+       (llvm-/= y 0)))
+   (define ((wrap f) . args)
+     (apply f args))
 
-  ((case op
-   ((+) llvm+)
-   ((-) llvm-)
-   ((*) llvm*)
-   ((/) llvm/)
-   ((=) (compose up-convert llvm-=))
-   ((<=) (compose up-convert llvm-<=))
-   ((<>) (compose up-convert llvm-/=))
-   ((\|) (compose up-convert (wrap llvm-or) down-convert))
-   ((&) (compose up-convert (wrap llvm-and) down-convert))
-   (else (error 'compile "Math operator ~a not yet implemented" op))) l r))
+   ((case op
+      ((+) llvm+)
+      ((-) llvm-)
+      ((*) llvm*)
+      ((/) llvm/)
+      ((=) (compose up-convert llvm-=))
+      ((<=) (compose up-convert llvm-<=))
+      ((>=) (compose up-convert llvm->=))
+      ((<) (compose up-convert llvm-<))
+      ((>) (compose up-convert llvm->))
+      ((<>) (compose up-convert llvm-/=))
+      ((\|) (compose up-convert (wrap llvm-or) down-convert))
+      ((&) (compose up-convert (wrap llvm-and) down-convert))
+      (else (error 'compile "Math operator ~a not yet implemented" op))) l r))
 
  (define (compile-closure-call closure args)
    (apply llvm-call
