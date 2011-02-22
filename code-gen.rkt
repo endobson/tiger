@@ -310,6 +310,7 @@
   ((int-type? type) value)
   ((unit-type? type) value)
   ((function-type? type) (llvm-ptr-to-int value))
+  ((box-type? type) (llvm-ptr-to-int value))
   (else (error 'int-cast "Unsupported-type ~a" type))))
 
 

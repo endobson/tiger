@@ -226,9 +226,15 @@
        fields)))
     ((source:array-type ref) (inter:proto-array-type (source:type-reference-name ref)))
     ((source:function-type arg-types return-type)
-     (inter:proto-function-type
-      (map source:type-reference-name arg-types)
-      (and return-type (source:type-reference-name return-type))))))
+     (if (andmap source:type-reference? arg-types)
+         (inter:proto-function-type
+          (map source:type-reference-name arg-types)
+          
+          (and return-type (if (source:type-reference? return-type)
+                               (source:type-reference-name return-type)
+                               (error 'transform "Unsimplified function-type"))))
+         (error 'transform "Unsimplified function-type")))))
+         
 
   (inter:fix-proto-types (map convert-type-declaration type-decs) type-env))
 

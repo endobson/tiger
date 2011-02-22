@@ -100,7 +100,7 @@
    ((break) expr)
    ((assignment name val)
     (let ((ty (hash-ref mutated name)))
-     (primop-expr (box-set!-primop (make-box-type ty)) (list (identifier name) val))))
+     (primop-expr (box-set!-primop (make-box-type ty)) (list (identifier name) (fix val)))))
    (else (error 'remove-assignment "Fix has a missing case"))))
 
  (: fix-function ((Pair Symbol function) -> (Pair Symbol function)))
