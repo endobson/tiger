@@ -48,11 +48,8 @@
  (for/fold: : type-environment
   ((env : type-environment env))
   ((fun : (Pair Symbol function) funs))
-  (hash-set env (car fun) (function->type (cdr fun)))))
+  (hash-set env (car fun) (function->function-type (cdr fun)))))
 
-(: function->type (function -> function-type))
-(define (function->type fun)
- (make-function-type (map (inst cdr Symbol type) (function-args fun)) (function-return-type fun)))
 
 (: app (continuation expression -> expression))
 (define (app k val)
@@ -95,10 +92,11 @@
                            (function
                             (list (cons val-name int-type))
                             unit-type
-                            (if val-name (cps t (continuation (identifier cont-name) (continuation-type ty))
-                                                (hash-set env val-name int-type))
-                                         (cps f (continuation (identifier cont-name) (continuation-type ty))
-                                                (hash-set env val-name int-type)))))
+                            (conditional (identifier val-name)
+                              (cps t (continuation (identifier cont-name) (continuation-type ty))
+                                     (hash-set env val-name int-type))
+                              (cps f (continuation (identifier cont-name) (continuation-type ty))
+                                     (hash-set env val-name int-type)) unit-type)))
                      (cons cont-name
                            (function
                             (list (cons cont-val-name expr-type))
@@ -112,7 +110,7 @@
      ((name : Symbol (reverse names))
       (expr : expression (reverse exprs)))
      (let ((fun-name (gensym 'cps-fun)) (e-type (type-of expr env)))
-      (bind-rec (list (cons fun-name (function (list (cons name e-type)) unit-type (continuation-expr cont))))
+      (bind-rec (list (cons fun-name (function (list (cons name e-type)) unit-type final-expr)))
        (cps expr (continuation (identifier fun-name) (continuation-type e-type)) env))))))))
 
         
@@ -142,7 +140,7 @@
                                               (list
                                                (primop-expr (integer-constant-primop 1) empty)
                                                (identifier var))))))))
-                          (conditional (primop-expr (equality-primop #t int-type) (list (identifier var) (identifier final-name)))
+                          (conditional (primop-expr (math-primop '<=) (list (identifier var) (identifier final-name)))
                             (cps body (continuation (identifier cont-name) (continuation-type unit-type)) (hash-set env var int-type))
                             (primop-expr (unit-primop) empty)
                             unit-type)))))

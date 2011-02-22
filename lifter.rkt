@@ -78,10 +78,7 @@
    ((ir:bind-rec closure-decs body)
     (let ((id-env
            (foldl (lambda: ((dec : (Pair Symbol ir:function)) (id-env : id-environment))
-            (match (cdr dec)
-             ((ir:function args ty body)
-              (hash-set id-env (car dec)
-               (make-function-type (map (inst cdr Symbol type) args) ty))))) id-env closure-decs)))
+              (hash-set id-env (car dec) (ir:function->function-type (cdr dec)))) id-env closure-decs)))
       (let-values (((body env) (lift body id-env env)))
        (let-values (((closures env)
           (for/fold: : (values (Listof (Pair Symbol lifted:create-closure)) lift-environment)

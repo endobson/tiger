@@ -24,6 +24,11 @@
 (struct: function ((args : (Listof (Pair Symbol type))) (return-type : type) (body : expression)) #:transparent)
 
 
+(: function->function-type (function -> function-type))
+(define (function->function-type fun)
+ (make-function-type (map (inst cdr Symbol type) (function-args fun)) (function-return-type fun)))
+
+
 
 
 

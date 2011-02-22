@@ -105,6 +105,16 @@
      (llvm-set-position non-zero-block)
      (llvm-ret (llvm-zext (llvm-load (llvm-gep string 0 1 0)) (llvm-int-type))))
     (values name (make-closure function llvm-type "ord_closure")))
+   ((chr)
+    (define llvm-type (convert-function-type type))
+    (define function (llvm-add-function llvm-type "chr"))
+    (llvm-set-position (llvm-add-block-to-function function))
+    (define int (llvm-get-param 1))
+    (define string (llvm-alloc-string 1))
+    (llvm-store 1 (llvm-gep string 0 0))
+    (llvm-store (llvm-trunc int (llvm-int8-type)) (llvm-gep string 0 1 0))
+    (llvm-ret string)
+    (values name (make-closure function llvm-type "chr_closure")))
    ((size)
     (define llvm-type (convert-function-type type))
     (define function (llvm-add-function llvm-type "string_size"))
@@ -150,7 +160,7 @@
 
 
 
-   (else (values name 'nyi)))))
+   (else (values name (error 'code-gen "External-function ~a not yet implemented" name))))))
     
     
 
@@ -201,7 +211,9 @@
                      (llvm-load (llvm-gep (llvm-get-param 0) 0 1 i))
                      (convert-type arg-type))))))
        (let ((val (compile-expr env info-env all-functions body)))
-        (if val (llvm-ret val) (LLVMBuildRetVoid (current-builder)))))))))
+        (if (unit-type? (function-type-return-type type))
+            (LLVMBuildRetVoid (current-builder))
+            (llvm-ret val) )))))))
 
 
 

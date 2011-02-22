@@ -55,11 +55,7 @@
            (bound (for/fold: : set
                     ((bound : set bound))
                     ((sym : Symbol syms) (fun : function funs))
-                   (hash-set bound sym
-                    (make-function-type
-                     (map (inst cdr Symbol type)
-                          (function-args fun))
-                     (function-return-type fun)))))
+                   (hash-set bound sym (function->function-type fun))))
            (hashes (map (lambda: ((fun : function))
                          (match fun
                           ((function args return body)

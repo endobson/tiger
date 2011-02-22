@@ -2,7 +2,17 @@
 
 (require (for-syntax racket/base))
 
-(require "tiger-parser.rkt" "semantic-checks.rkt"  "type-checker.rkt" "environment.rkt" "fix-loops.rkt" "fix-assignment.rkt" "fix-units.rkt")
+(require
+ "tiger-parser.rkt"
+ "semantic-checks.rkt"
+ "type-checker.rkt"
+ "environment.rkt"
+ "fix-loops.rkt"
+ "fix-assignment.rkt"
+ "fix-units.rkt"
+ (prefix-in ir: "ir-typechecker.rkt")
+ 
+ )
 
 (require "lifter.rkt" "code-gen.rkt")
 
@@ -38,7 +48,7 @@
 
 
 (define (simplify ast)
- (remove-units
+ (let ((ir 
   (inter->ir:transform
    (fix-loops
      (remove-assignment
@@ -46,6 +56,17 @@
        ast
        source->inter:global-env
        source->inter:global-type-env))))))
+  ;(eprintf "Checking CPS types~n")
+  ;(pretty-write ir)
+  (ir:type-check ir)
+  ;(eprintf "CPS types Passed~n")
+  (let ((ir (remove-units ir)))
+   ;(eprintf "Checking unit removed types~n")
+   ;(pretty-write ir)
+   (ir:type-check ir)
+   ;(eprintf "Unit removed types passed~n")
+   ir)))
+
 
 
 (define (full-compile s/p)
@@ -53,7 +74,7 @@
         (simple-program (simplify checked-program))
         ;(_ (pretty-write simple-program))
         (lifted-program (lift simple-program))
-        (_ (pretty-write lifted-program))
+        ;(_ (pretty-write lifted-program))
         (compiled-program (compile-program lifted-program)))
   compiled-program))
 
