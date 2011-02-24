@@ -24,9 +24,7 @@
   (define closure  (llvm-add-global (closure-type type 0) name))
   (llvm-set-initializer
    closure
-   (LLVMConstStructInContext (current-context)
-    (list funval (LLVMConstArray (llvm-int-type) empty))
-    #f))
+   (llvm-struct funval (llvm-array (llvm-int-type))))
   closure)
   
 
@@ -46,7 +44,7 @@
     
     (llvm-set-position (llvm-add-block-to-function exit-function))
     (llvm-call real-exit-function (llvm-get-param 1))
-    (LLVMBuildRetVoid (current-builder))
+    (llvm-ret-void)
 
     (define exit-closure (make-closure exit-function exit-type "exit_closure"))
 
@@ -82,7 +80,7 @@
     (llvm-set-position (llvm-add-block-to-function function))
     (llvm-call real-function 1 (llvm-bit-cast (llvm-gep (llvm-get-param 1) 0 1) (llvm-pointer-type (llvm-int8-type))) 
                                (llvm-load (llvm-gep (llvm-get-param 1) 0 0)))
-    (LLVMBuildRetVoid (current-builder))
+    (llvm-ret-void)
     (values name (make-closure function llvm-type "print_closure")))
    ((flush)
     (define llvm-type (convert-function-type type))
@@ -90,7 +88,7 @@
     (define function (llvm-add-function llvm-type "flush"))
     (llvm-set-position (llvm-add-block-to-function function))
     ;(llvm-call real-function 1)
-    (LLVMBuildRetVoid (current-builder))
+    (llvm-ret-void)
     (values name (make-closure function llvm-type "flush_closure")))
    ((ord)
     (define llvm-type (convert-function-type type))
@@ -212,21 +210,21 @@
                      (convert-type arg-type))))))
        (let ((val (compile-expr env info-env all-functions body)))
         (if (unit-type? (function-type-return-type type))
-            (LLVMBuildRetVoid (current-builder))
+            (llvm-ret-void)
             (llvm-ret val) )))))))
 
 
 
-  (define main-entry (LLVMAppendBasicBlockInContext (current-context) main-function "entry"))
-  (LLVMPositionBuilderAtEnd (current-builder) main-entry)
+  (define main-entry (llvm-add-block-to-function main-function #:name "entry"))
+  (llvm-set-position main-entry)
   (compile-expr global-environment info-env all-functions (lifted-program-expr prog))
   (llvm-ret 0)
 
 
   )
- (let ((err (LLVMVerifyModule module 'LLVMReturnStatusAction)))
+ (let ((err (llvm-verify-module module)))
   (when err
-   (LLVMDumpModule module)
+   (eprintf "~a~n" (llvm-module-description module))
    (error 'compile-program "~a" err)))
   
 
@@ -299,11 +297,12 @@
 
 (define (llvm-alloc-string size)
  (let ((string (llvm-array-malloc (llvm-int8-type) (llvm+ 4 size))))
-  (llvm-bit-cast string (llvm-pointer-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) 0)) #f)))))
+  (llvm-bit-cast string (llvm-pointer-type (llvm-struct-type (llvm-int-type) (llvm-array-type (llvm-int8-type)))))))
+
 
 (define (llvm-alloc-array type size)
  (let ((array (llvm-array-malloc type (llvm+ 1 size))))
-  (llvm-bit-cast array (llvm-pointer-type (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType type 0)) #f)))))
+  (llvm-bit-cast array (llvm-pointer-type (llvm-struct-type (llvm-int-type) (llvm-array-type type))))))
 
   
   
@@ -338,9 +337,9 @@
        (define-basic-block t-block f-block m-block)
        (llvm-cond-br cond t-block f-block)
        (let ((tv (begin (llvm-set-position t-block) (begin0 (recur t) (llvm-br m-block))))
-             (tfinal-block (LLVMGetInsertBlock (current-builder)))
+             (tfinal-block (llvm-get-insert-block))
              (fv (begin (llvm-set-position f-block) (begin0 (recur f) (llvm-br m-block))))
-             (ffinal-block (LLVMGetInsertBlock (current-builder))))
+             (ffinal-block (llvm-get-insert-block)))
         (llvm-set-position m-block)
         (if (unit-type? ty)
             #f
@@ -412,10 +411,10 @@
 
  (define (compile-string-constant str)
   (define str-length (string-length str))
-  (define (llvm-str-type n) (LLVMStructTypeInContext (current-context) (list (llvm-int-type) (LLVMArrayType (llvm-int8-type) n)) #f))
-  (define llvm-str (llvm-add-global (llvm-str-type str-length)""))
+  (define (llvm-str-type n) (llvm-struct-type (llvm-int-type) (llvm-array-type (llvm-int8-type) n)))
+  (define llvm-str (llvm-add-global (llvm-str-type str-length) ""))
   (llvm-set-initializer llvm-str
-    (LLVMConstStructInContext (current-context) (list (llvm-int str-length) (LLVMConstStringInContext (current-context) str #t)) #f))
+    (llvm-struct str-length str))
   (llvm-bit-cast llvm-str (convert-type string-type)))
   
 
@@ -512,6 +511,6 @@
 
 
 (define (write-program program path)
- (LLVMWriteBitcodeToFile program path))
+ (llvm-write-bitcode-to-file program path))
 
 
