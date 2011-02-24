@@ -49,15 +49,15 @@
       (append (recur body)
        (append-map (lambda: ((f : ir:function))
         (match f
-         ((ir:function args ty body)
+         ((ir:function name args ty body)
           (remove-all (map (inst car Symbol type) args)
                       (recur body))))) funs)))))))
  (recur expr))
        
 
-(: add-function (Symbol lifted:lifted-function lift-environment -> lift-environment))
-(define (add-function name fun env)
- (hash-set env name fun))
+(: add-function (lifted:lifted-function lift-environment -> lift-environment))
+(define (add-function fun env)
+ (hash-set env (lifted:lifted-function-name fun) fun))
 
 
 
@@ -87,9 +87,8 @@
             ((dec : (Pair Symbol ir:function) closure-decs))
            (let ((name (car dec)))
             (match (cdr dec)
-             ((ir:function args ty body)
-              (let* ((fun-name (gensym name))
-                     (arg-names (map (inst car Symbol type) args))
+             ((ir:function fun-name args ty body)
+              (let* ((arg-names (map (inst car Symbol type) args))
                      (arg-types (map (inst cdr Symbol type) args))
                      (free-vars (remove-all arg-names (find-free-variables body))))
                (let ((id-env (foldl (lambda: ((name : Symbol) (ty : type) (env : id-environment)) (hash-set env name ty))
@@ -98,8 +97,8 @@
                  (values
                   (cons (cons name (lifted:create-closure fun-name free-vars)) closures)
                   (add-function
-                   fun-name
                    (lifted:lifted-function
+                    fun-name
                     (make-function-type arg-types ty)
                     arg-names
                     free-vars

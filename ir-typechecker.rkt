@@ -120,7 +120,7 @@
  (: check-function (environment -> (function -> Void)))
  (define ((check-function env) fun)
   (match fun
-   ((function args return body)
+   ((function name args return body)
     (let ((env (for/fold: : environment
                  ((env : environment env))
                  ((arg : (Pair Symbol type) args))

@@ -12,11 +12,11 @@
  (define ((fix-function env) pair)
   (cons (car pair)
    (match (cdr pair)
-    ((function args return body)
+    ((function name args return body)
      (let* ((bad-args (filter-map (lambda: ((arg : (Pair Symbol type))) (and (unit-type? (cdr arg)) (car arg))) args))
             (good-args (filter (lambda: ((arg : (Pair Symbol type))) (not (unit-type? (cdr arg)))) args))
             (env (for/fold: : environment ((env : environment env)) ((arg : Symbol bad-args)) (hash-set env arg #t))))
-      (function good-args return ((fix env) body)))))))
+      (function name good-args return ((fix env) body)))))))
 
  (: unit expression)
  (define unit (primop-expr (unit-primop) empty))

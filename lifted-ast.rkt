@@ -31,7 +31,8 @@
 
 
 (struct: lifted-function
- ((type : function-type)
+ ((name : Symbol)
+  (type : function-type)
   (args : (Listof Symbol))
   (closed-variables : (Listof Symbol))
   (closed-variable-types : (Listof type))

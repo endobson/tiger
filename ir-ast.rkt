@@ -15,7 +15,7 @@
 (struct: sequence ((first : expression) (next : expression)) #:transparent)
 
 
-(struct: function ((args : (Listof (Pair Symbol type))) (return-type : type) (body : expression)) #:transparent)
+(struct: function ((name : Symbol) (args : (Listof (Pair Symbol type))) (return-type : type) (body : expression)) #:transparent)
 
 (: function->function-type (function -> function-type))
 (define (function->function-type fun)

@@ -11,13 +11,13 @@
 (define (transform-functions funs)
  (map (inst cons Symbol ir:function)
    (map (inst car Symbol inter:function) funs)
-   (map transform-function (map (inst cdr Symbol inter:function) funs))))
+   (map transform-function funs)))
 
-(: transform-function (inter:function -> ir:function))
-(define (transform-function fun)
- (match fun
+(: transform-function ((Pair Symbol inter:function) -> ir:function))
+(define (transform-function pair)
+ (match (cdr pair)
   ((inter:function args ty body)
-   (ir:function args ty (transform body)))))
+   (ir:function (gensym (car pair)) args ty (transform body)))))
 
 (: transform (inter:expression -> ir:expression))
 (define (transform expr)

@@ -52,7 +52,7 @@
 
   (for (((name fun-desc) function-descriptions))
    (match fun-desc
-    ((lifted-function type arg-names closed-names closed-types body)
+    ((lifted-function fun-name type arg-names closed-names closed-types body)
      (let* ((fun (hash-ref all-functions name))
             (block (llvm-add-block-to-function fun)))
       (llvm-set-position block)
@@ -145,7 +145,7 @@
      (define closed-types (map lifted-function-closed-variable-types functions))
      (define llvm-fun-types
       (for/list ((f functions))
-       (match f ((lifted-function type arg-names closed-names closed-types body) (convert-function-type type)))))
+       (match f ((lifted-function name type arg-names closed-names closed-types body) (convert-function-type type)))))
      (define closures
       (map (lambda (t n) (llvm-malloc (machine-closure-type t n))) llvm-fun-types num-closed-variables))
      (define zero-closures
