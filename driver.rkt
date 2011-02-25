@@ -10,6 +10,7 @@
  "fix-loops.rkt"
  "fix-assignment.rkt"
  "fix-units.rkt"
+ "ir-printable-ast.rkt"
  (prefix-in ir: "ir-typechecker.rkt")
  
  )
@@ -58,6 +59,7 @@
        source->inter:global-type-env))))))
   ;(eprintf "Checking CPS types~n")
   ;(pretty-write ir)
+  ;(pretty-write (ir->printable ir))
   (ir:type-check ir)
   ;(eprintf "CPS types Passed~n")
   (let ((ir (remove-units ir)))
@@ -67,16 +69,17 @@
    ;(eprintf "Unit removed types passed~n")
    ir)))
 
+(define (source->ir s/p)
+ (simplify (check-semantics (parse s/p))))
+
+(define (full-compile s/p mode)
+ (case mode
+  ((llvm) (compile-program (lift (source->ir s/p))))
+  ((lifted) (lift (source->ir s/p)))
+  ((ir) (source->ir s/p))
+  (else (error 'full-compile "Unknown mode ~a" mode))))
 
 
-(define (full-compile s/p)
- (let* ((checked-program (check-semantics (parse s/p)))
-        (simple-program (simplify checked-program))
-        ;(_ (pretty-write simple-program))
-        (lifted-program (lift simple-program))
-        ;(_ (pretty-write lifted-program))
-        (compiled-program (compile-program lifted-program)))
-  compiled-program))
 
 (define (compile-llvm program exe-path-string)
  (define exe-path 
@@ -88,13 +91,13 @@
    (with-temporary-file object
     (write-program program bitcode)
     (system* "/usr/bin/env" "llc" "-O2" "-o" (path->string assembly) (path->string bitcode))
-     (case (system-type 'os)
-      ((macosx)
-       (system* "/usr/bin/env" "as" "-arch" "i686" "-o" (path->string object) (path->string assembly)))
-      ((unix)
-       (system* "/usr/bin/env" "as" "-march" "i686" "-o" (path->string object) (path->string assembly)))
-      (else (error 'compile-llvm "Unknown System type")))
-     (system* "/usr/bin/env" "clang" (path->string object) "-o" (path->string exe-path))))))
+    (case (system-type 'os)
+     ((macosx)
+      (system* "/usr/bin/env" "as" "-arch" "i686" "-o" (path->string object) (path->string assembly)))
+     ((unix)
+      (system* "/usr/bin/env" "as" "-march" "i686" "-o" (path->string object) (path->string assembly)))
+     (else (error 'compile-llvm "Unknown System type")))
+    (system* "/usr/bin/env" "clang" (path->string object) "-o" (path->string exe-path))))))
 
 
 
