@@ -12,6 +12,8 @@
  "fix-units.rkt"
  "ir-printable-ast.rkt"
  "inline-one-use.rkt"
+ "remove-empty-bind-rec.rkt"
+ "remove-extra-variable-bindings.rkt"
  (prefix-in ir: "ir-typechecker.rkt")
  
  )
@@ -71,7 +73,17 @@
    ir)))
 
 (define (optimize ir)
- (inline-once-used ir))
+ (define (simple-optimize ir)
+  (remove-extra-variable-bindings
+   (remove-empty-bind-rec
+    (inline-once-used ir))))
+
+ (let loop ((ir ir))
+  (let ((new-ir (simple-optimize ir)))
+   (if (equal? new-ir ir)
+       new-ir
+       (loop new-ir)))))
+
 
 
 (define (source->ir s/p)
