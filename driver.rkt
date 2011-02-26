@@ -11,6 +11,7 @@
  "fix-assignment.rkt"
  "fix-units.rkt"
  "ir-printable-ast.rkt"
+ "inline-one-use.rkt"
  (prefix-in ir: "ir-typechecker.rkt")
  
  )
@@ -69,14 +70,18 @@
    ;(eprintf "Unit removed types passed~n")
    ir)))
 
+(define (optimize ir)
+ (inline-once-used ir))
+
+
 (define (source->ir s/p)
  (simplify (check-semantics (parse s/p))))
 
 (define (full-compile s/p mode)
  (case mode
-  ((llvm) (compile-program (lift (source->ir s/p))))
-  ((lifted) (lift (source->ir s/p)))
-  ((ir) (source->ir s/p))
+  ((llvm) (compile-program (lift (optimize (source->ir s/p)))))
+  ((lifted) (lift (optimize (source->ir s/p))))
+  ((ir) (optimize (source->ir s/p)))
   (else (error 'full-compile "Unknown mode ~a" mode))))
 
 
