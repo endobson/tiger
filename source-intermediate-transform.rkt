@@ -79,11 +79,11 @@
         (error 'transform "Annotated function-call with non function type ~a" prog)))
       (error 'transform "Unannotated function-call ~a" prog)))
     ((source:sequence exprs)
-     (if (empty? exprs) (inter:primop-expr (unit-primop) empty)
-      (let loop ((expr (first exprs)) (exprs (rest exprs)))
-       (if (empty? exprs) (recur expr)
-          (inter:sequence (recur expr)
-           (loop (first exprs) (rest exprs)))))))
+     (cond
+      ((empty? exprs) (inter:primop-expr (unit-primop) empty))
+      ((= (length exprs) 2)
+       (inter:bind (gensym 'ignored) inter:unit-type (recur (first exprs)) (recur (second exprs))))
+      (else (error 'transform "Bad sequence ~a" prog))))
     ((source:assignment lvalue expr)
      (let ((val (recur expr)))
       (match lvalue
@@ -169,6 +169,7 @@
      (if ref
          (inter:primop-expr (nil-primop (lookup-type-reference ref type-env)) empty)
          (error 'transform "Untyped nil remains")))
+    (else (error 'transform "Case ~a remains" prog))
     ))
   recur)
  

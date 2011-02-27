@@ -6,14 +6,13 @@
 (provide (all-defined-out))
 
 (define-type expression
- (U identifier primop-expr conditional bind bind-rec sequence while-loop for-loop break assignment))
+ (U identifier primop-expr conditional bind bind-rec while-loop for-loop break assignment))
 
 (struct: identifier ((name : Symbol)) #:transparent)
 (struct: primop-expr ((rator : primop) (args : (Listof expression))) #:transparent)
 (struct: conditional ((condition : expression) (t-branch : expression) (f-branch : expression) (type : type)) #:transparent)
 (struct: bind ((name : Symbol) (type : type) (expr : expression) (body : expression)) #:transparent)
 (struct: bind-rec ((functions : (Listof (Pair Symbol function))) (body : expression)) #:transparent)
-(struct: sequence ((first : expression) (next : expression)) #:transparent)
 
 (struct: while-loop ((guard : expression) (body : expression)) #:transparent)
 (struct: for-loop ((id : Symbol) (init : expression) (final : expression) (body : expression)) #:transparent)

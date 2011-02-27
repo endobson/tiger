@@ -31,8 +31,6 @@
    (ir:bind v ty (transform expr) (transform body)))
   ((inter:bind-rec funs body)
    (ir:bind-rec (transform-functions funs) (transform body)))
-  ((inter:sequence first next)
-   (ir:sequence (transform first) (transform next)))
   (else
    (error 'transform "Unsupported remaining form ~a" expr))))
   

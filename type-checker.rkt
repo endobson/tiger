@@ -184,20 +184,23 @@
        (let-values (((body type) (recur body)))
         (values (binder declarations body) type)))))
     ((sequence exprs) 
-     (: rec ((Listof expression) -> (values (Listof expression) pos-type)))
+     (: rec ((Listof expression) -> (values expression pos-type)))
      (define (rec exprs)
       (if (empty? (rest exprs))
           (let-values (((expr type) (recur (first exprs))))
-           (values (list expr) type))
-          (let-values (((rec-expr _) (recur (first exprs)))
-                       ((rec-exprs type) (rec (rest exprs))))
-           (values (cons rec-expr rec-exprs) type))))
-      
+           (values expr type))
+          (let-values (((rec-expr1 type1) (recur (first exprs)))
+                       ((rec-expr2 type2) (rec (rest exprs))))
+           (cond
+            ((unit-type? type1)
+               (values (sequence (list rec-expr1 rec-expr2)) type2))
+            ((equal? 'nil type1)
+             (error 'type-check "Expression has nil-type and cannot be assigned a type" rec-expr1))
+            (else
+             (values (binder (list (variable-declaration (gensym 'ignored) (unresolve-type type1 env) rec-expr1)) rec-expr2) type2))))))
      (cond 
       ((empty? exprs) (values (sequence empty) unit-type))
-      (else
-       (let-values (((exprs type) (rec exprs)))
-        (values (sequence exprs) type)))))
+      (else (rec exprs))))
     ((assignment value expr)
      (let-values (((value v-type) (recur value))
                   ((expr e-type) (recur expr)))
