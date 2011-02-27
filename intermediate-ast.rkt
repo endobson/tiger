@@ -69,7 +69,7 @@
     ((bind name ty expr body) 
      (type-of expr (hash-set env name ty)))
     ((bind-rec funs body)
-     (type-of expr
+     (type-of body
       (foldr
        (lambda: ((p : (Pair Symbol function))
                  (env : (HashTable Symbol type)))

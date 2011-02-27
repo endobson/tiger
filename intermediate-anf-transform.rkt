@@ -84,7 +84,7 @@
       ((context done sym type todo)
        (process
         expr
-        (context done var type (lambda: ((cont : (anf:expression -> anf:expression))) (process body (context cont sym type todo))))))))
+        (context done var ty (lambda: ((cont : (anf:expression -> anf:expression))) (process body (context cont sym type todo))))))))
     ((inter:bind-rec funs body)
      (match ctx
       ((context done sym type todo)
