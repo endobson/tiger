@@ -1,1 +1,3 @@
-tiger-server.rkt
+#!/bin/sh
+
+exec ./tiger-server.rkt "$@"
