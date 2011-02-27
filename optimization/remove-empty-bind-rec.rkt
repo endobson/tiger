@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require "ir-ast.rkt")
+(require "../ir-ast.rkt")
 (require racket/list racket/match)
 
 (provide remove-empty-bind-rec)

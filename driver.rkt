@@ -11,11 +11,11 @@
  "fix-assignment.rkt"
  "fix-units.rkt"
  "ir-printable-ast.rkt"
- "inline-one-use.rkt"
- "remove-empty-bind-rec.rkt"
- "remove-extra-variable-bindings.rkt"
- "remove-unused-variable-bindings.rkt"
- "known-function-optimization.rkt"
+ "optimization/inline-one-use.rkt"
+ "optimization/remove-empty-bind-rec.rkt"
+ "optimization/remove-extra-variable-bindings.rkt"
+ "optimization/remove-unused-variable-bindings.rkt"
+ "optimization/known-function-optimization.rkt"
  (prefix-in ir: "ir-typechecker.rkt")
  
  )

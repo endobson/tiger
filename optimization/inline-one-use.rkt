@@ -1,7 +1,7 @@
 #lang typed/racket
 
 
-(require "types.rkt" "ir-ast.rkt" "primop.rkt")
+(require "../types.rkt" "../ir-ast.rkt" "../primop.rkt")
 
 (require racket/match racket/list)
 
