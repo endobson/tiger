@@ -9,6 +9,7 @@
  (U math-primop
     unit-primop
     call-closure-primop
+    call-known-function-primop
     integer-constant-primop
     string-constant-primop
     nil-primop
@@ -31,6 +32,7 @@
 (define-struct: equality-primop ((equality : Boolean) (type : type)) #:transparent)
 (define-struct: unit-primop () #:transparent)
 (define-struct: call-closure-primop ((type : function-type)) #:transparent)
+(define-struct: call-known-function-primop ((type : function-type) (name : Symbol)) #:transparent)
 (define-struct: integer-constant-primop ((val : Integer)) #:transparent)
 (define-struct: string-constant-primop ((val : String)) #:transparent)
 (define-struct: nil-primop ((type : type)) #:transparent)

@@ -189,6 +189,7 @@
 
 
    ((call-closure-primop ty) (compile-closure-call (first vals) (rest vals)))
+   ((call-known-function-primop ty name) (compile-known-function-call name vals))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
    ((equality-primop equal type) (compile-equality-test equal type (first vals) (second vals)))
@@ -283,6 +284,13 @@
     (llvm-load (llvm-gep closure 0 0))
     closure
     args))
+
+
+ (define (compile-known-function-call function-name args)
+   (llvm-call*
+    (hash-ref fun-env function-name)
+    args))
+
 
  (define (lookup-identifier id env)
   (hash-ref env id (lambda ()

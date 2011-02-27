@@ -19,7 +19,7 @@
              (parameterize ((current-output-port output-port))
               (call-with-input-file source-file
                (lambda (input-port)
-                (let ((program (full-compile input-port)))
+                (let ((program (full-compile input-port 'llvm)))
                  (if (compile-llvm program binary-file) 0 1))))))))))
          (flush-output (current-error-port))
          (write val)

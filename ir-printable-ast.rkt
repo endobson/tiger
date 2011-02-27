@@ -22,6 +22,7 @@
   Integer
   String
   'nil
+  (List 'call-known Symbol)
   (List 'runtime Symbol)
   'create-box
   'create-array
@@ -66,6 +67,7 @@
   ((equality-primop eql ty) (if eql '= '<>))
   ((unit-primop) 'unit)
   ((call-closure-primop ty) 'call)
+  ((call-known-function-primop ty name) (list 'call-known name))
   ((integer-constant-primop v) v)
   ((string-constant-primop v) v)
   ((nil-primop ty) 'nil)
