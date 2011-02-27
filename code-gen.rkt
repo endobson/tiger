@@ -34,20 +34,22 @@
 
 
 
-  (define ext-functions (add-external-functions))
+  (define-values (ext-functions ext-closures) (add-external-functions))
   (define function-descriptions (lifted-program-functions prog))
   (define all-functions 
-   (for/hash (((name fun-desc) function-descriptions))
-    (values name
-     (llvm-add-function
-      (convert-function-type (lifted-function-type fun-desc))
-      (symbol->string name)))))
+   (hash-union
+    (for/hash (((name fun-desc) function-descriptions))
+     (values name
+      (llvm-add-function
+       (convert-function-type (lifted-function-type fun-desc))
+       (symbol->string name))))
+    ext-functions))
 
      
   (define info-env (hash-union function-descriptions))
   (define global-environment
    (for/hash (((name primop) runtime-primop-database))
-    (values primop (hash-ref ext-functions name))))
+    (values primop (hash-ref ext-closures name))))
 
 
   (for (((name fun-desc) function-descriptions))
@@ -190,6 +192,7 @@
 
    ((call-closure-primop ty) (compile-closure-call (first vals) (rest vals)))
    ((call-known-function-primop ty name) (compile-known-function-call name vals))
+   ((call-known-runtime-primop ty name) (compile-known-runtime-call name vals))
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
    ((equality-primop equal type) (compile-equality-test equal type (first vals) (second vals)))
@@ -287,6 +290,11 @@
 
 
  (define (compile-known-function-call function-name args)
+   (llvm-call*
+    (hash-ref fun-env function-name)
+    args))
+
+ (define (compile-known-runtime-call function-name args)
    (llvm-call*
     (hash-ref fun-env function-name)
     args))

@@ -10,6 +10,7 @@
     unit-primop
     call-closure-primop
     call-known-function-primop
+    call-known-runtime-primop
     integer-constant-primop
     string-constant-primop
     nil-primop
@@ -33,10 +34,11 @@
 (define-struct: unit-primop () #:transparent)
 (define-struct: call-closure-primop ((type : function-type)) #:transparent)
 (define-struct: call-known-function-primop ((type : function-type) (name : Symbol)) #:transparent)
+(define-struct: call-known-runtime-primop ((type : function-type) (name : Symbol)) #:transparent)
 (define-struct: integer-constant-primop ((val : Integer)) #:transparent)
 (define-struct: string-constant-primop ((val : String)) #:transparent)
 (define-struct: nil-primop ((type : type)) #:transparent)
-(define-struct: runtime-primop ((type : type) (name : Symbol)) #:transparent)
+(define-struct: runtime-primop ((type : function-type) (name : Symbol)) #:transparent)
 
 (define-struct: box-set!-primop ((type : box-type)) #:transparent)
 (define-struct: box-ref-primop ((type : box-type)) #:transparent)

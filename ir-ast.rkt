@@ -8,7 +8,7 @@
  (U primop-expr conditional bind bind-rec sequence identifier))
 
 (struct: identifier ((name : Symbol)) #:transparent)
-(struct: primop-expr ((rator : primop) (args : (Listof expression))) #:transparent)
+(struct: primop-expr ((op : primop) (args : (Listof expression))) #:transparent)
 (struct: conditional ((condition : expression) (t-branch : expression) (f-branch : expression) (type : type)) #:transparent)
 (struct: bind ((name : Symbol) (type : type) (expr : expression) (body : expression)) #:transparent)
 (struct: bind-rec ((functions : (Listof (Pair Symbol function))) (body : expression)) #:transparent)

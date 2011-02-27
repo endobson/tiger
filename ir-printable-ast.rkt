@@ -23,6 +23,7 @@
   String
   'nil
   (List 'call-known Symbol)
+  (List 'call-runtime Symbol)
   (List 'runtime Symbol)
   'create-box
   'create-array
@@ -68,6 +69,7 @@
   ((unit-primop) 'unit)
   ((call-closure-primop ty) 'call)
   ((call-known-function-primop ty name) (list 'call-known name))
+  ((call-known-runtime-primop ty name) (list 'call-runtime name))
   ((integer-constant-primop v) v)
   ((string-constant-primop v) v)
   ((nil-primop ty) 'nil)
