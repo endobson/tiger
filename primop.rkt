@@ -2,6 +2,7 @@
 
 (provide (except-out (all-defined-out) make-runtime-primop))
 
+(require racket/match racket/list)
 (require "types.rkt" "external-functions.rkt")
 
 
@@ -60,3 +61,36 @@
   (hash-map external-function-database
    (lambda: ((name : Symbol) (type : function-type)) (cons name (runtime-primop type name))))))
  
+
+(: primop-arg-types (primop -> (Listof type)))
+(define (primop-arg-types op)
+ (match op
+  ((integer-constant-primop n) empty)
+  ((string-constant-primop str) empty)
+  ((unit-primop) empty)
+  ((nil-primop ty) empty)
+  ((runtime-primop ty name) empty)
+  ((math-primop sym)
+   (list int-type int-type))
+  ((equality-primop eql ty) (list ty ty))
+  ((call-closure-primop ty)
+   (cons ty (function-type-arg-types ty)))
+  ((create-box-primop ty) 
+   (list (box-type-elem-type ty)))
+  ((create-array-primop ty) 
+   (list int-type (array-type-elem-type ty)))
+  ((create-record-primop ty)
+   (map (inst cdr Symbol type) (record-type-fields ty)))
+  ((box-ref-primop ty)
+   (list ty))
+  ((array-ref-primop ty)
+   (list ty int-type))
+  ((field-ref-primop ty name)
+   (list ty))
+  ((box-set!-primop ty)
+   (list ty (box-type-elem-type ty)))
+  ((array-set!-primop ty)
+   (list ty int-type (array-type-elem-type ty)))
+  ((field-set!-primop ty name)
+   (list ty (record-type-field-type ty name)))
+  (else (error 'type-check "Not yet implemented ~a" op))))
