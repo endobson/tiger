@@ -11,12 +11,14 @@
  "fix-assignment.rkt"
  "fix-units.rkt"
  "ir-printable-ast.rkt"
+ "types.rkt"
  "optimization/inline-one-use.rkt"
  "optimization/remove-empty-bind-rec.rkt"
  "optimization/remove-extra-variable-bindings.rkt"
  "optimization/remove-unused-variable-bindings.rkt"
  "optimization/known-function-optimization.rkt"
  (prefix-in ir: "ir-typechecker.rkt")
+ (only-in "intermediate-ast.rkt" (type-of inter:type-of))
  
  )
 
@@ -24,6 +26,7 @@
 
 (require (prefix-in source->inter: "source-intermediate-transform.rkt"))
 (require (prefix-in inter->ir: "intermediate-ir-transform.rkt"))
+(require (prefix-in inter->anf: "intermediate-anf-transform.rkt"))
 
 (require racket/file racket/system racket/pretty)
 
@@ -54,14 +57,15 @@
 
 
 (define (simplify ast)
- (let ((ir 
-  (inter->ir:transform
+ (let ((inter
    (fix-loops
      (remove-assignment
       (source->inter:transform 
        ast
        source->inter:global-env
-       source->inter:global-type-env))))))
+       source->inter:global-type-env)))))
+  (let ((ir (inter->ir:transform inter))
+        (anf (inter->anf:transform inter (inter:type-of inter))))
   ;(eprintf "Checking CPS types~n")
   ;(pretty-write ir)
   ;(pretty-write (ir->printable ir))
@@ -72,7 +76,7 @@
    ;(pretty-write ir)
    (ir:type-check ir)
    ;(eprintf "Unit removed types passed~n")
-   ir)))
+   ir))))
 
 (define (optimize ir)
  (define (simple-optimize ir)

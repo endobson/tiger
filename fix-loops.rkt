@@ -7,35 +7,6 @@
 
 
 (define-type type-environment (HashTable Symbol type))
-(: type-of (expression type-environment -> type))
-(define (type-of expr env)
- (match expr 
-  ((identifier id) (hash-ref env id (lambda () (error 'cps "Unbound identifier ~a in ~a" id env))))
-  ((primop-expr op args) 
-   (match op
-    ((call-closure-primop ty) (function-type-return-type ty))
-    ((math-primop sym) int-type)
-    ((equality-primop eql type) int-type)
-    ((unit-primop) unit-type)
-    ((integer-constant-primop val) int-type)
-    ((string-constant-primop val) string-type) 
-    ((nil-primop ty) ty)
-    ((runtime-primop ty name) ty) 
-    ((box-set!-primop ty) unit-type)
-    ((array-set!-primop ty) unit-type) 
-    ((field-set!-primop ty field) unit-type)
-
-    ((box-ref-primop ty) (box-type-elem-type ty)) 
-    ((array-ref-primop ty) (array-type-elem-type ty))
-    ((field-ref-primop ty field) (record-type-field-type ty field))
-    
-    ((create-box-primop ty) ty)
-    ((create-record-primop ty) ty)
-    ((create-array-primop ty) ty) 
-
-    (else (error 'type-of "Not yet implemented primop ~a" op))))
-  
-  (else (error 'type-of "Not yet implemented ~a" expr))))
  
 
 (: continuation-type (type -> function-type))

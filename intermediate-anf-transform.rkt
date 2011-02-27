@@ -7,6 +7,8 @@
          "primop.rkt"
          "types.rkt")
 
+(provide transform)
+
 (struct: context
  ((done : (anf:expression -> anf:expression))
   (current-sym : Symbol)
