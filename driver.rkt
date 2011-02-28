@@ -9,20 +9,20 @@
  "environment.rkt"
  "fix-loops.rkt"
  "fix-assignment.rkt"
- "fix-units.rkt"
- "ir-printable-ast.rkt"
+ "fix-units-anf.rkt"
+ "ir-anf-printable-ast.rkt"
  "types.rkt"
  "optimization/inline-one-use.rkt"
  "optimization/remove-empty-bind-rec.rkt"
  "optimization/remove-extra-variable-bindings.rkt"
  "optimization/remove-unused-variable-bindings.rkt"
  "optimization/known-function-optimization.rkt"
- (prefix-in ir: "ir-typechecker.rkt")
+ (prefix-in ir: "anf-typechecker.rkt")
  (only-in "intermediate-ast.rkt" (type-of inter:type-of))
  
  )
 
-(require "lifter.rkt" "code-gen.rkt")
+(require "anf-lifter.rkt" "code-gen.rkt")
 
 (require (prefix-in source->inter: "source-intermediate-transform.rkt"))
 (require (prefix-in inter->ir: "intermediate-ir-transform.rkt"))
@@ -64,16 +64,15 @@
        ast
        source->inter:global-env
        source->inter:global-type-env)))))
-  (let ((ir (inter->ir:transform inter))
-        (anf (inter->anf:transform inter (inter:type-of inter))))
+  (let ((ir (inter->anf:transform inter (inter:type-of inter))))
   ;(eprintf "Checking CPS types~n")
-  ;(pretty-write ir)
-  ;(pretty-write (ir->printable ir))
+  ;(pretty-write inter)
+  ;(pretty-write (anf->printable ir))
   (ir:type-check ir)
   ;(eprintf "CPS types Passed~n")
   (let ((ir (remove-units ir)))
    ;(eprintf "Checking unit removed types~n")
-   ;(pretty-write ir)
+   ;(pretty-write (anf->printable ir))
    (ir:type-check ir)
    ;(eprintf "Unit removed types passed~n")
    ir))))
@@ -86,6 +85,8 @@
      (remove-empty-bind-rec
       (inline-once-used ir))))))
 
+ ir
+#;
  (let loop ((ir ir))
   (let ((new-ir (simple-optimize ir)))
    (if (equal? new-ir ir)

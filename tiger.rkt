@@ -2,7 +2,7 @@
 #lang racket/base
 
 (require (for-syntax racket/base))
-(require "driver.rkt" "ir-printable-ast.rkt")
+(require "driver.rkt" "ir-anf-printable-ast.rkt")
 (require racket/cmdline racket/pretty)
 
 (require (planet endobson/llvm/llvm-simple))
@@ -39,6 +39,6 @@
  (set-output-file
   (case output-mode
    ((llvm) (display (llvm-module-description program)))
-   ((ir) (pretty-write (ir->printable program)))
+   ((ir) (pretty-write (anf->printable program)))
    ((lifted) (pretty-write program)))))
 

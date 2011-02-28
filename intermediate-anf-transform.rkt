@@ -31,7 +31,7 @@
     ((context done current-sym current-ty todo)
      (if (symbol? arg)
          (begin
-          (hash-set! renamed current-sym arg)
+          (hash-set! renamed current-sym (pos-rename arg))
           (todo done))
          (todo (lambda: ((expr : anf:expression))
                 (done (anf:bind-primop current-sym current-ty (first arg) (rest arg) expr))))))))
@@ -44,53 +44,75 @@
     
 
   (: top-process (inter:expression type -> anf:expression))
-  (define (top-process expr ty)
-   (let ((return (gensym 'retval)))
-    (process expr 
-     (context (inst values anf:expression) return ty (lambda: ((cont : (anf:expression -> anf:expression))) (cont (anf:return (pos-rename return))))))))
+  (define (top-process expr function-return-type)
 
-
-  (: process (inter:expression context -> anf:expression))
-  (define (process expr ctx)
-   (match expr
-    ((inter:identifier name) (fill-context ctx name))
-    ((inter:primop-expr op args)
-     (match ctx
-      ((context done sym ty todo)
-       (: arg-processor ((Listof Symbol) (Listof inter:expression) (Listof type) -> (anf:expression -> anf:expression) -> anf:expression))
-       (define ((arg-processor done-args next-args next-arg-types) cont)
-        (if (empty? next-args)
-            (fill-context (context cont sym ty todo) (cons op (reverse done-args)))
-            (let ((next-sym (gensym 'primop-arg)))
-             (process (first next-args) (context cont next-sym (first next-arg-types) (arg-processor (cons next-sym done-args) (rest next-args) (rest next-arg-types)))))))
-            
-       ((arg-processor empty args (primop-arg-types op)) done))))
-    ((inter:conditional c t f ty)
-     (let ((clos-name (gensym 'cond)) (arg-name (gensym 'cond-arg)) (result-name (gensym 'result)))
+   (: process (inter:expression type context -> anf:expression))
+   (define (process expr return-type ctx)
+    (match expr
+     ((inter:identifier name) (fill-context ctx name))
+     ((inter:primop-expr op args)
       (match ctx
        ((context done sym ty todo)
-        (process c (context (lambda: ((expr : anf:expression))
-                              (anf:bind-rec (list (cons clos-name
-                               (anf:function (gensym 'cond-fun)
-                                             (list (cons arg-name int-type))
-                                             ty
-                                             (anf:conditional arg-name (top-process t ty) (top-process f ty) ty))))
-                               (anf:bind-primop sym ty (call-closure-primop (make-function-type (list int-type) ty)) (list (pos-rename result-name)) expr)))
-                            result-name
-                            int-type
-                            todo))))))
-    ((inter:bind var ty expr body)
-     (match ctx
-      ((context done sym type todo)
-       (process
-        expr
-        (context done var ty (lambda: ((cont : (anf:expression -> anf:expression))) (process body (context cont sym type todo))))))))
-    ((inter:bind-rec funs body)
-     (match ctx
-      ((context done sym type todo)
-       (process body (context (lambda: ((expr : anf:expression)) (anf:bind-rec (map process-function funs) expr)) sym type todo)))))
-    (else
-     (error 'transform "Unsupported remaining form ~a" expr))))
+        (: arg-processor ((Listof Symbol) (Listof inter:expression) (Listof type) -> (anf:expression -> anf:expression) -> anf:expression))
+        (define ((arg-processor done-args next-args next-arg-types) cont)
+         (if (empty? next-args)
+             (fill-context (context cont sym ty todo) (cons op (map pos-rename (reverse done-args))))
+             (let ((next-sym (gensym 'primop-arg)))
+              (process (first next-args) return-type (context cont next-sym (first next-arg-types) (arg-processor (cons next-sym done-args) (rest next-args) (rest next-arg-types)))))))
+             
+        ((arg-processor empty args (primop-arg-types op)) done))))
+     ((inter:conditional c t f ty)
+      (let ((clos-name (gensym 'condcont)) (arg-name (gensym 'condcont-arg)) (result-name (gensym 'result)))
+       (match ctx
+        ((context done sym ty todo)
+         (process c return-type
+                    (context (lambda: ((expr : anf:expression))
+                               (done
+                                (anf:bind-rec
+                                    (list
+                                    
+                                     (cons clos-name
+                                 (anf:function (gensym 'condcont-fun)
+                                               (list (cons arg-name ty))
+                                               return-type
+                                               (fill-context (context (inst values anf:expression) sym ty todo) arg-name))))
+                                 expr)))
+                             result-name
+                             int-type
+                             (lambda: ((finish : (anf:expression -> anf:expression))) 
+                              (: proc (inter:expression -> anf:expression))
+                              (define (proc expr)
+                               (let ((tf-name (gensym 'cond-val)))
+                                (process expr return-type
+                                              (context (inst values anf:expression) tf-name ty
+                                               (lambda: ((cont : (anf:expression -> anf:expression)))
+                                                (let ((result-name (gensym 'result)))
+                                                 (cont (anf:bind-primop result-name return-type (call-closure-primop (make-function-type (list ty) return-type))
+                                                        (list clos-name tf-name) (anf:return result-name)))))))))
+                              (finish (anf:conditional result-name (proc t) (proc f) return-type)))))))))
+     ((inter:bind var ty expr body)
+      (match ctx
+       ((context done sym type todo)
+        (process
+         expr
+         return-type
+         (context done var ty (lambda: ((cont : (anf:expression -> anf:expression))) (process body return-type (context cont sym type todo))))))))
+     ((inter:bind-rec funs body)
+      (match ctx
+       ((context done sym type todo)
+        (process body return-type (context (lambda: ((expr : anf:expression)) (done (anf:bind-rec (map process-function funs) expr))) sym type todo)))))
+     (else
+      (error 'transform "Unsupported remaining form ~a" expr))))
+
+   (let ((return (gensym 'retval)))
+    (process expr function-return-type
+     (context (inst values anf:expression)
+              return
+              function-return-type
+              (lambda: ((cont : (anf:expression -> anf:expression)))
+               (cont (anf:return (pos-rename return))))))))
+
+
   (top-process expr ty))
   
 

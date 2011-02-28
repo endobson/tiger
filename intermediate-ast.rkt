@@ -67,7 +67,7 @@
       (else (error 'type-of "Not yet implemented primop ~a" op))))
     ((conditional c t f ty) ty)
     ((bind name ty expr body) 
-     (type-of expr (hash-set env name ty)))
+     (type-of body (hash-set env name ty)))
     ((bind-rec funs body)
      (type-of body
       (foldr
