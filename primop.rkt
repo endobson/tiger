@@ -62,6 +62,43 @@
    (lambda: ((name : Symbol) (type : function-type)) (cons name (runtime-primop type name))))))
  
 
+(: primop-name (primop -> Symbol))
+(define (primop-name op)
+ (match op
+  ((integer-constant-primop n) (string->symbol (string-append "int-" (number->string n) "-val")))
+  ((string-constant-primop str) (string->symbol (string-append "string-" (format "~s" str) "-val")))
+  ((unit-primop) 'unit)
+  ((nil-primop ty) 'nil)
+  ((runtime-primop ty name) name)
+  ((math-primop op)
+   (case op
+    ((+) 'plus)
+    ((-) 'minus)
+    ((*) 'times)
+    ((/) 'divide)
+    ((<=) 'less-then-equal)
+    ((>=) 'greater-then-equal)
+    ((>) 'greater)
+    ((<) 'less)
+    ((&) 'and)
+    ((\|) 'or)))
+  ((equality-primop eql type) (if eql 'equal 'not-equal))
+  ((call-closure-primop ty) 'call)
+  ((create-box-primop ty) 'create-box)
+  ((create-array-primop ty) 'create-array)
+  ((create-record-primop ty) 'create-record)
+  ((box-ref-primop ty) 'box-ref)
+  ((array-ref-primop ty) 'array-ref)
+  ((field-ref-primop ty name) (string->symbol (string-append "field-" (symbol->string name) "-ref")))
+  ((box-set!-primop ty) 'box-set!)
+  ((array-set!-primop ty) 'array-set!)
+  ((field-set!-primop ty name) (string->symbol (string-append "field-" (symbol->string name) "-ref")))
+  (else (error 'primop-name "Missing Case"))))
+
+    
+
+
+
 (: primop-arg-types (primop -> (Listof type)))
 (define (primop-arg-types op)
  (match op
