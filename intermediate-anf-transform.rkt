@@ -62,7 +62,7 @@
              
         ((arg-processor empty args (primop-arg-types op)) done))))
      ((inter:conditional c t f ty)
-      (let ((clos-name (gensym 'condcont)) (arg-name (gensym 'condcont-arg)) (result-name (gensym 'result)))
+      (let ((clos-name (gensym 'condcont)) (arg-name (gensym 'condcont-arg)) (result-name (gensym 'if-result)))
        (match ctx
         ((context done sym ty todo)
          (process c return-type
@@ -88,8 +88,8 @@
                                                (lambda: ((cont : (anf:expression -> anf:expression)))
                                                 (let ((result-name (gensym 'result)))
                                                  (cont (anf:bind-primop result-name return-type (call-closure-primop (make-function-type (list ty) return-type))
-                                                        (list clos-name tf-name) (anf:return result-name)))))))))
-                              (finish (anf:conditional result-name (proc t) (proc f) return-type)))))))))
+                                                        (list clos-name (pos-rename tf-name)) (anf:return result-name)))))))))
+                              (finish (anf:conditional (pos-rename result-name) (proc t) (proc f) return-type)))))))))
      ((inter:bind var ty expr body)
       (match ctx
        ((context done sym type todo)
