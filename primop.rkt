@@ -112,6 +112,10 @@
   ((equality-primop eql ty) (list ty ty))
   ((call-closure-primop ty)
    (cons ty (function-type-arg-types ty)))
+  ((call-known-function-primop ty name)
+   (cons ty (function-type-arg-types ty)))
+  ((call-known-runtime-primop ty name)
+   (cons ty (function-type-arg-types ty)))
   ((create-box-primop ty) 
    (list (box-type-elem-type ty)))
   ((create-array-primop ty) 
@@ -130,4 +134,7 @@
    (list ty int-type (array-type-elem-type ty)))
   ((field-set!-primop ty name)
    (list ty (record-type-field-type ty name)))
-  (else (error 'type-check "Not yet implemented ~a" op))))
+  (else (error 'primop-arg-types "Not yet implemented ~a" op))))
+
+
+

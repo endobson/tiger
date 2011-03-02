@@ -1,11 +1,8 @@
 #lang typed/racket/base
 
-(require "../ir-ast.rkt" "../primop.rkt")
+(require "../ir-anf-ast.rkt" "side-effects.rkt" "../primop.rkt")
 (require racket/match racket/list)
 
-(require "../ir-printable-ast.rkt")
-(require/typed racket/pretty
- (pretty-write (Any -> Void)))
 
 (provide remove-unused-variable-bindings)
 
@@ -13,25 +10,27 @@
 (define (remove-unused-variable-bindings expr)
  (: counts (HashTable Symbol Natural))
  (define counts (make-hash))
+
+ (: update-count (Symbol -> Void))
+ (define (update-count name)
+  (hash-update! counts name add1
+   (lambda () (error 'remove-unused-variable-bindings "Unbound identifier ~a in ~a" name counts))))
+
  (: recur (expression -> expression))
  (define (recur expr)
   (match expr
-   ((identifier name)
-    (hash-update! counts name add1
-     (lambda () (error 'remove-unused-variable-bindings "Unbound identifier ~a in ~a" name counts)))
+   ((return name)
+    (update-count name)
     expr)
-   ((primop-expr op args)
+   ((bind-primop var ty op args expr)
+    (for-each update-count args)
     (when (call-known-function-primop? op)
-     (let ((name (call-known-function-primop-name op)))
-      (hash-update! counts name add1
-       (lambda () (error 'remove-unused-variable-bindings "Unknown function ~a in ~a" name counts)))))
-    (primop-expr op (map recur args)))
-   ((bind var ty expr body)
+     (update-count (call-known-function-primop-name op)))
     (hash-set! counts var 0)
-    (let ((expr (recur expr)) (body (recur body)))
-     (if (= 0 (hash-ref counts var))
-         (sequence expr body)
-         (bind var ty expr body))))
+    (let ((expr (recur expr)))
+     (if (and (= 0 (hash-ref counts var)) (not (primop->side-effect op)))
+         expr
+         (bind-primop var ty op args expr))))
    ((bind-rec funs body)
     (for: ((p : (Pair Symbol function) funs))
      (hash-set! counts (car p) 0)
@@ -45,10 +44,8 @@
         ((function name args ret body)
          (function name args ret (recur body)))))) funs)
      (recur body)))
-   ((sequence first next)
-    (sequence (recur first) (recur next)))
    ((conditional c t f ty)
-    (conditional (recur c) (recur t) (recur f) ty))
-   (else (error 'remove-extra-variable-bindings "Missing case ~a" expr))))
+    (update-count c)
+    (conditional c (recur t) (recur f) ty))))
  (recur expr))
  

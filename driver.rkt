@@ -14,7 +14,6 @@
  "types.rkt"
  "optimization/inline-one-use.rkt"
  "optimization/remove-empty-bind-rec.rkt"
- "optimization/remove-extra-variable-bindings.rkt"
  "optimization/remove-unused-variable-bindings.rkt"
  "optimization/known-function-optimization.rkt"
  (prefix-in ir: "anf-typechecker.rkt")
@@ -79,14 +78,12 @@
 
 (define (optimize ir)
  (define (simple-optimize ir)
-  (known-function-optimization
-   (remove-unused-variable-bindings
-    (remove-extra-variable-bindings
-     (remove-empty-bind-rec
-      (inline-once-used ir))))))
+  (let ((ir (inline-tail-once-used ir)))
+   (let ((ir (remove-empty-bind-rec ir)))
+    (let ((ir (remove-unused-variable-bindings ir)))
+     (let ((ir (known-function-optimization ir)))
+      ir)))))
 
- ir
-#;
  (let loop ((ir ir))
   (let ((new-ir (simple-optimize ir)))
    (if (equal? new-ir ir)

@@ -1,5 +1,6 @@
 #lang typed/racket/base
 
+borked
 (require "types.rkt" "ir-ast.rkt" "primop.rkt")
 
 (require racket/list racket/match)
@@ -94,7 +95,7 @@
        unit-type)
 
 
-      (else (error 'type-check "Not yet implemented ~a" op))))
+      (else (error 'type-check "old Not yet implemented ~a" op))))
     ((conditional c t f ty)
      (type-assert c int-type)
      (type-assert t ty)

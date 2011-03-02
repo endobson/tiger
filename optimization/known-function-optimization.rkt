@@ -1,7 +1,7 @@
 
 #lang typed/racket/base
 
-(require "../ir-ast.rkt" "../primop.rkt")
+(require "../ir-anf-ast.rkt" "../primop.rkt")
 (require racket/match racket/list)
 
 
@@ -15,31 +15,21 @@
  (: recur (expression -> expression))
  (define (recur expr)
   (match expr
-   ((identifier name) expr)
-   ((primop-expr op args)
-    (define (normal) (primop-expr op (map recur args)))
+   ((return name) expr)
+   ((bind-primop var ty op args expr)
+    (define (normal) (bind-primop var ty op args (recur expr)))
     (if (call-closure-primop? op) 
         (let ((arg1 (first args)))
-         (cond
-          ((identifier? arg1) 
-            (let ((fun (hash-ref env (identifier-name arg1) (lambda () #f))))
-             (cond
+         (let ((fun (hash-ref env arg1 (lambda () #f))))
+           (cond
               ((symbol? fun)
-               (primop-expr (call-known-function-primop (call-closure-primop-type op) fun) (map recur args)))
+               (bind-primop var ty (call-known-function-primop (call-closure-primop-type op) fun) args (recur expr)))
               ((runtime-primop? fun)
                (match fun
                 ((runtime-primop ty name)
-                 (primop-expr (call-known-runtime-primop ty name) (map recur args)))))
+                 (bind-primop var ty (call-known-runtime-primop ty name) args (recur expr)))))
               ((not fun) (normal)))))
-          ((primop-expr? arg1) 
-           (match (primop-expr-op arg1)
-            ((runtime-primop ty name)
-             (primop-expr (call-known-runtime-primop ty name) (map recur args)))
-            (else (normal))))
-          (else (normal))))
         (normal)))
-   ((bind var ty expr body)
-    (bind var ty (recur expr) (recur body)))
    ((bind-rec funs body)
     (for: ((p : (Pair Symbol function) funs))
      (hash-set! env (car p) (function-name (cdr p))))
@@ -50,10 +40,7 @@
         ((function name args ret body)
          (function name args ret (recur body)))))) funs)
      (recur body)))
-   ((sequence first next)
-    (sequence (recur first) (recur next)))
    ((conditional c t f ty)
-    (conditional (recur c) (recur t) (recur f) ty))
-   (else (error 'remove-extra-variable-bindings "Missing case ~a" expr))))
+    (conditional c (recur t) (recur f) ty))))
  (recur expr))
  
