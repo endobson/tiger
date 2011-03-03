@@ -2,31 +2,32 @@
 
 (require "primop.rkt")
 (require "types.rkt")
+(require "unique.rkt")
 (require racket/list racket/match)
 
-(provide (all-defined-out))
+(provide (all-defined-out) unique)
 
 (define-type expression
  (U identifier primop-expr conditional bind bind-rec while-loop for-loop break assignment))
 
-(struct: identifier ((name : Symbol)) #:transparent)
+(struct: identifier ((name : unique)) #:transparent)
 (struct: primop-expr ((rator : primop) (args : (Listof expression))) #:transparent)
 (struct: conditional ((condition : expression) (t-branch : expression) (f-branch : expression) (type : type)) #:transparent)
-(struct: bind ((name : Symbol) (type : type) (expr : expression) (body : expression)) #:transparent)
-(struct: bind-rec ((functions : (Listof (Pair Symbol function))) (body : expression)) #:transparent)
+(struct: bind ((name : unique) (type : type) (expr : expression) (body : expression)) #:transparent)
+(struct: bind-rec ((functions : (Listof (Pair unique function))) (body : expression)) #:transparent)
 
 (struct: while-loop ((guard : expression) (body : expression)) #:transparent)
-(struct: for-loop ((id : Symbol) (init : expression) (final : expression) (body : expression)) #:transparent)
+(struct: for-loop ((id : unique) (init : expression) (final : expression) (body : expression)) #:transparent)
 (struct: break () #:transparent)
-(struct: assignment ((name : Symbol) (val : expression)) #:transparent)
+(struct: assignment ((name : unique) (val : expression)) #:transparent)
 
 
-(struct: function ((args : (Listof (Pair Symbol type))) (return-type : type) (body : expression)) #:transparent)
+(struct: function ((args : (Listof (Pair unique type))) (return-type : type) (body : expression)) #:transparent)
 
 
 (: function->function-type (function -> function-type))
 (define (function->function-type fun)
- (make-function-type (map (inst cdr Symbol type) (function-args fun)) (function-return-type fun)))
+ (make-function-type (map (inst cdr unique type) (function-args fun)) (function-return-type fun)))
 
 
 
@@ -35,11 +36,11 @@
 (: type-of 
  (case-lambda
   (expression -> type)
-  (expression (HashTable Symbol type) -> type)))
+  (expression (HashTable unique type) -> type)))
 (define type-of
  (case-lambda:
-  (((expr : expression)) (type-of expr (ann (make-immutable-hash empty) (HashTable Symbol type))))
-  (((expr : expression) (env : (HashTable Symbol type)))
+  (((expr : expression)) (type-of expr (ann (make-immutable-hash empty) (HashTable unique type))))
+  (((expr : expression) (env : (HashTable unique type)))
    (match expr 
     ((identifier id) (hash-ref env id (lambda () (error 'type-of "Unbound identifier ~a in ~a" id env))))
     ((primop-expr op args) 
@@ -71,8 +72,8 @@
     ((bind-rec funs body)
      (type-of body
       (foldr
-       (lambda: ((p : (Pair Symbol function))
-                 (env : (HashTable Symbol type)))
+       (lambda: ((p : (Pair unique function))
+                 (env : (HashTable unique type)))
         (hash-set env (car p) (function->function-type (cdr p)))) env funs)))
     ((while-loop g body) unit-type)
     ((for-loop id init final body) unit-type)

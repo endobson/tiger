@@ -1,12 +1,12 @@
 #lang typed/racket/base
 
-(require "intermediate-ast.rkt" "types.rkt" "primop.rkt")
+(require "intermediate-ast.rkt" "types.rkt" "primop.rkt" "unique.rkt")
 (require racket/match racket/list)
 
 (provide (rename-out (fix-loops-top fix-loops)))
 
 
-(define-type type-environment (HashTable Symbol type))
+(define-type type-environment (HashTable unique type))
  
 
 (: continuation-type (type -> function-type))
@@ -14,11 +14,11 @@
  (make-function-type (list ty) unit-type))
 
 
-(: add-function-types ((Listof (Pair Symbol function)) type-environment -> type-environment))
+(: add-function-types ((Listof (Pair unique function)) type-environment -> type-environment))
 (define (add-function-types funs env)
  (for/fold: : type-environment
   ((env : type-environment env))
-  ((fun : (Pair Symbol function) funs))
+  ((fun : (Pair unique function) funs))
   (hash-set env (car fun) (function->function-type (cdr fun)))))
 
 
@@ -35,7 +35,7 @@
  (define (cps expr cont env)
   (match expr
    ((bind v ty expr body)
-    (let* ((fun-name (gensym 'cps-fun)) (env (hash-set env fun-name (continuation-type ty))))
+    (let* ((fun-name (gen-uniq 'cps-fun)) (env (hash-set env fun-name (continuation-type ty))))
      (bind-rec
       (list (cons fun-name (function (list (cons v ty)) unit-type
                                      (cps body cont (hash-set env v ty)))))
@@ -51,10 +51,10 @@
     (error 'cps "Unremoved for-loop"))
    ((break) (primop-expr (unit-primop) empty))
    ((conditional c t f ty)
-    (let* ((fun-name (gensym 'cps-fun))
-           (cont-name (gensym 'cont-cond-fun))
-           (val-name (gensym 'condition-val))
-           (cont-val-name (gensym 'cont-val))
+    (let* ((fun-name (gen-uniq 'cps-fun))
+           (cont-name (gen-uniq 'cont-cond-fun))
+           (val-name (gen-uniq 'condition-val))
+           (cont-val-name (gen-uniq 'cont-val))
            (expr-type ty)
            (env (hash-set (hash-set env fun-name (continuation-type int-type)) cont-name (continuation-type expr-type))))
      (bind-rec (list (cons fun-name
@@ -73,12 +73,12 @@
                             (app cont (identifier cont-val-name)))))
       (cps c (continuation (identifier fun-name) (continuation-type int-type)) env))))
   ((primop-expr op exprs)
-   (let ((names (map (lambda: ((e : expression)) (gensym 'primop-arg)) exprs)))
+   (let ((names (map (lambda: ((e : expression)) (gen-uniq 'primop-arg)) exprs)))
     (for/fold: : expression
      ((final-expr : expression (app cont (primop-expr op (map identifier names)))))
-     ((name : Symbol (reverse names))
+     ((name : unique (reverse names))
       (expr : expression (reverse exprs)))
-     (let ((fun-name (gensym 'cps-fun)) (e-type (type-of expr env)))
+     (let ((fun-name (gen-uniq 'cps-fun)) (e-type (type-of expr env)))
       (bind-rec (list (cons fun-name (function (list (cons name e-type)) unit-type final-expr)))
        (cps expr (continuation (identifier fun-name) (continuation-type e-type)) env))))))))
 
@@ -89,10 +89,10 @@
 (define (fix-for-loop loop env)
  (match loop
   ((for-loop var init final body)
-   (let ((init-name (gensym 'init))
-         (final-name (gensym 'final))
-         (fun-name (gensym 'for-loop))
-         (cont-name (gensym 'continue)))
+   (let ((init-name (gen-uniq 'init))
+         (final-name (gen-uniq 'final))
+         (fun-name (gen-uniq 'for-loop))
+         (cont-name (gen-uniq 'continue)))
     (bind init-name int-type init 
      (bind final-name int-type final 
       (bind-rec (list (cons fun-name
@@ -100,7 +100,7 @@
                         (list (cons var int-type))
                         unit-type
                         (bind-rec (list (cons cont-name 
-                                         (function (list (cons (gensym 'ignored) unit-type))
+                                         (function (list (cons (gen-uniq 'ignored) unit-type))
                                           unit-type
                                           (primop-expr (call-closure-primop (continuation-type int-type))
                                            (list
@@ -119,9 +119,9 @@
 (define (fix-while-loop loop env)
  (match loop
   ((while-loop cond body)
-   (let ((fun-name  (gensym 'while-loop)))
+   (let ((fun-name  (gen-uniq 'while-loop)))
     (bind-rec (list (cons fun-name
-                     (function (list (cons (gensym 'ignored) unit-type))
+                     (function (list (cons (gen-uniq 'ignored) unit-type))
                       unit-type
                       (conditional cond
                        (cps body (continuation (identifier fun-name) (continuation-type unit-type)) env)
@@ -135,7 +135,7 @@
 
 (: fix-loops (expression type-environment -> expression))
 (define (fix-loops expr env)
- (: fix-loops-fun (type-environment -> ((Pair Symbol function) -> (Pair Symbol function))))
+ (: fix-loops-fun (type-environment -> ((Pair unique function) -> (Pair unique function))))
  (define ((fix-loops-fun env) fun)
   (cons (car fun)
    (match (cdr fun)
@@ -144,7 +144,7 @@
       (fix-loops body
        (for/fold: : type-environment
         ((env : type-environment env))
-        ((arg : (Pair Symbol type) args))
+        ((arg : (Pair unique type) args))
         (hash-set env (car arg) (cdr arg)))))))))
  (match expr
   ((bind v ty expr body)

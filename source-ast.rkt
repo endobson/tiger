@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require "core-ast.rkt")
+(require "core-ast.rkt" "unique.rkt")
 
 (provide (all-defined-out))
 
@@ -33,7 +33,7 @@
 
 
 
-(define-struct: identifier ((symbol : Symbol)) #:transparent)
+(define-struct: identifier ((symbol : (U Symbol unique))) #:transparent)
 (define-struct: field-ref ((base : lvalue) (field : Symbol) (type : (Option type-reference))) #:transparent)
 (define-struct: array-ref ((base : lvalue) (index : expression) (type : (Option type-reference))) #:transparent)
 
@@ -59,17 +59,17 @@
 (define-struct: create-array ((type : type-reference) (size : expression) (value : expression)) #:transparent)
 
 (define-struct: while-loop ((guard : expression) (body : expression)) #:transparent)
-(define-struct: for-loop ((id : Symbol) (init : expression) (final : expression) (body : expression)) #:transparent)
+(define-struct: for-loop ((id : (U Symbol unique)) (init : expression) (final : expression) (body : expression)) #:transparent)
 (define-struct: break () #:transparent)
 
-(define-struct: type-declaration ((name : Symbol) (type : (U type-reference compound-type))) #:transparent)
+(define-struct: type-declaration ((name : (U Symbol unique)) (type : (U type-reference compound-type))) #:transparent)
 (define-struct: function-declaration
- ((name : Symbol)
-  (args : (Listof (Pair Symbol type-reference)))
+ ((name : (U Symbol unique))
+  (args : (Listof (Pair (U Symbol unique) type-reference)))
   (return-type : (Option type-reference))
   (body : expression)) #:transparent)
-(define-struct: variable-declaration ((name : Symbol) (type : type-reference) (value : expression)) #:transparent)
-(define-struct: untyped-variable-declaration ((name : Symbol) (value : expression)) #:transparent)
+(define-struct: variable-declaration ((name : (U Symbol unique)) (type : type-reference) (value : expression)) #:transparent)
+(define-struct: untyped-variable-declaration ((name : (U Symbol unique)) (value : expression)) #:transparent)
 
 
 

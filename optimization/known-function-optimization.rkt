@@ -1,7 +1,7 @@
 
 #lang typed/racket/base
 
-(require "../ir-anf-ast.rkt" "../primop.rkt")
+(require "../ir-anf-ast.rkt" "../primop.rkt" "../unique.rkt")
 (require racket/match racket/list)
 
 
@@ -10,7 +10,7 @@
 
 (: known-function-optimization (expression -> expression))
 (define (known-function-optimization expr)
- (: env (HashTable Symbol (U runtime-primop Symbol)))
+ (: env (HashTable unique (U runtime-primop unique)))
  (define env (make-hash))
  (: recur (expression -> expression))
  (define (recur expr)
@@ -22,7 +22,7 @@
         (let ((arg1 (first args)))
          (let ((fun (hash-ref env arg1 (lambda () #f))))
            (cond
-              ((symbol? fun)
+              ((unique? fun)
                (bind-primop var ty (call-known-function-primop (call-closure-primop-type op) fun) args (recur expr)))
               ((runtime-primop? fun)
                (match fun
@@ -31,10 +31,10 @@
               ((not fun) (normal)))))
         (normal)))
    ((bind-rec funs body)
-    (for: ((p : (Pair Symbol function) funs))
+    (for: ((p : (Pair unique function) funs))
      (hash-set! env (car p) (function-name (cdr p))))
     (bind-rec
-     (map (lambda: ((p : (Pair Symbol function)))
+     (map (lambda: ((p : (Pair unique function)))
       (cons (car p)
        (match (cdr p)
         ((function name args ret body)

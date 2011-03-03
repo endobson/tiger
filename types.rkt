@@ -1,5 +1,6 @@
 #lang typed/racket/base
 
+(require "unique.rkt")
 
 (provide
  type
@@ -108,7 +109,7 @@
 
 
 
-(define-type proto-ref-type Symbol)
+(define-type proto-ref-type unique)
 
 (define-type proto-type proto-compound-type) 
 (define-type proto-compound-type
@@ -139,10 +140,10 @@
 
 
 
-(define-predicate proto-pair? (Pair Symbol proto-type))
-(define-predicate proto-ref-pair? (Pair Symbol proto-ref-type))
+(define-predicate proto-pair? (Pair unique proto-type))
+(define-predicate proto-ref-pair? (Pair unique proto-ref-type))
 
-(: fix-proto-types ((Listof (Pair Symbol (U proto-type proto-ref-type))) (HashTable Symbol type) -> (HashTable Symbol type)))
+(: fix-proto-types ((Listof (Pair unique (U proto-type proto-ref-type))) (HashTable unique type) -> (HashTable unique type)))
 
 
 (define (fix-proto-types sym-types env) 
@@ -155,7 +156,7 @@
    ((proto-array-type? type)    (array-type (gensym 'id) #f))
    ((proto-box-type? type)      (box-type #f))))
 
- (: fix-type ((HashTable Symbol type) -> (proto-type type -> Void)))
+ (: fix-type ((HashTable unique type) -> (proto-type type -> Void)))
  (define ((fix-type env) proto type)
   (cond
    ((and (proto-function-type? proto)
@@ -194,18 +195,18 @@
     
   
 
- (: lookup-type (proto-ref-type (HashTable Symbol type)-> type))
+ (: lookup-type (proto-ref-type (HashTable unique type)-> type))
  (define (lookup-type sym env)
   (hash-ref env sym
    (lambda () (error 'fix-proto-types "Unbound type name ~a in ~a" sym env))))
 
 
- (: lookup-types ((Listof proto-ref-type) (HashTable Symbol type) -> (Listof type)))
+ (: lookup-types ((Listof proto-ref-type) (HashTable unique type) -> (Listof type)))
  (define (lookup-types syms env)
   (map (lambda: ((s : proto-ref-type)) (lookup-type s env)) syms))
 
 
- (: lookup-fields ((Listof (Pair Symbol proto-ref-type)) (HashTable Symbol type) -> (Listof (Pair Symbol type))))
+ (: lookup-fields ((Listof (Pair Symbol proto-ref-type)) (HashTable unique type) -> (Listof (Pair Symbol type))))
  (define (lookup-fields fields env)
   (let ((names (map (inst car Symbol proto-ref-type) fields))
         (syms  (map (inst cdr Symbol proto-ref-type) fields)))
@@ -214,18 +215,18 @@
      (lookup-types syms env))))
 
 
- (: add-type (Symbol type (HashTable Symbol type) -> (HashTable Symbol type)))
+ (: add-type (unique type (HashTable unique type) -> (HashTable unique type)))
  (define (add-type sym type env) (hash-set env sym type))
 
- (: add-alias ((Pair Symbol proto-ref-type) (HashTable Symbol type) -> (HashTable Symbol type)))
+ (: add-alias ((Pair unique proto-ref-type) (HashTable unique type) -> (HashTable unique type)))
  (define (add-alias pair env)
   (hash-set env (car pair) (lookup-type (cdr pair) env)))
 
 
  (let* ((sym-proto-types (filter proto-pair? sym-types))
         (sym-proto-ref-types (filter proto-ref-pair? sym-types))
-        (syms (map (inst car Symbol proto-type) sym-proto-types))
-        (proto-types (map (inst cdr Symbol proto-type) sym-proto-types))
+        (syms (map (inst car unique proto-type) sym-proto-types))
+        (proto-types (map (inst cdr unique proto-type) sym-proto-types))
         (types (map convert-proto proto-types))
         (env (foldl add-type env syms types))
         (env (foldl add-alias env sym-proto-ref-types)))

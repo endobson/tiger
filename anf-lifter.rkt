@@ -6,6 +6,7 @@
 (require
          (prefix-in lifted: "lifted-ast.rkt")
          (prefix-in ir: "ir-anf-ast.rkt")
+         "unique.rkt"
          "types.rkt" )
 (provide lift)
 
@@ -24,14 +25,14 @@
 
 
 
-(: remove-all ((Listof Symbol) (Listof Symbol) -> (Listof Symbol)))
+(: remove-all ((Listof unique) (Listof unique) -> (Listof unique)))
 (define (remove-all bound symbols)
- (filter-not (lambda: ((id : Symbol)) (member id bound)) symbols))
+ (filter-not (lambda: ((id : unique)) (member id bound)) symbols))
 
 
-(: find-free-variables (ir:expression -> (Listof Symbol)))
+(: find-free-variables (ir:expression -> (Listof unique)))
 (define (find-free-variables expr)
- (: recur (ir:expression -> (Listof Symbol)))
+ (: recur (ir:expression -> (Listof unique)))
  (define (recur prog)
   (match prog
    ((ir:return sym) (list sym))
@@ -40,14 +41,14 @@
    ((ir:bind-primop var type op args expr)
     (append args (remove-all (list var) (recur expr))))
    ((ir:bind-rec functions body)
-    (let ((fun-names (map (inst car Symbol ir:function) functions))
-          (funs (map (inst cdr Symbol ir:function) functions)))
+    (let ((fun-names (map (inst car unique ir:function) functions))
+          (funs (map (inst cdr unique ir:function) functions)))
      (remove-all fun-names
       (append (recur body)
        (append-map (lambda: ((f : ir:function))
         (match f
          ((ir:function name args ty body)
-          (remove-all (map (inst car Symbol type) args)
+          (remove-all (map (inst car unique type) args)
                       (recur body))))) funs)))))))
  (recur expr))
        
@@ -62,7 +63,7 @@
 
 (: lift (ir:expression -> lifted:lifted-program))
 (define (lift expr)
- (define-type id-environment (HashTable Symbol type))
+ (define-type id-environment (HashTable unique type))
  (: lift
    (ir:expression id-environment lift-environment -> (values lifted:expression lift-environment)))
  (define (lift expr id-env env)
@@ -73,21 +74,21 @@
      (values (lifted:bind var type (lifted:primop-expr op (map lifted:identifier args)) body) env)))
    ((ir:bind-rec closure-decs body)
     (let ((id-env
-           (foldl (lambda: ((dec : (Pair Symbol ir:function)) (id-env : id-environment))
+           (foldl (lambda: ((dec : (Pair unique ir:function)) (id-env : id-environment))
               (hash-set id-env (car dec) (ir:function->function-type (cdr dec)))) id-env closure-decs)))
       (let-values (((body env) (lift body id-env env)))
        (let-values (((closures env)
-          (for/fold: : (values (Listof (Pair Symbol lifted:create-closure)) lift-environment)
-            ((closures : (Listof (Pair Symbol lifted:create-closure)) empty)
+          (for/fold: : (values (Listof (Pair unique lifted:create-closure)) lift-environment)
+            ((closures : (Listof (Pair unique lifted:create-closure)) empty)
              (env : lift-environment env))
-            ((dec : (Pair Symbol ir:function) closure-decs))
+            ((dec : (Pair unique ir:function) closure-decs))
            (let ((name (car dec)))
             (match (cdr dec)
              ((ir:function fun-name args ty body)
-              (let* ((arg-names (map (inst car Symbol type) args))
-                     (arg-types (map (inst cdr Symbol type) args))
+              (let* ((arg-names (map (inst car unique type) args))
+                     (arg-types (map (inst cdr unique type) args))
                      (free-vars (remove-all arg-names (find-free-variables body))))
-               (let ((id-env (foldl (lambda: ((name : Symbol) (ty : type) (env : id-environment)) (hash-set env name ty))
+               (let ((id-env (foldl (lambda: ((name : unique) (ty : type) (env : id-environment)) (hash-set env name ty))
                                     id-env arg-names arg-types)))
                 (let-values (((body env) (lift body id-env env)))
                  (values
@@ -98,7 +99,7 @@
                     (make-function-type arg-types ty)
                     arg-names
                     free-vars
-                    (map (lambda: ((s : Symbol)) (hash-ref id-env s (lambda () (error 'lift "Cannot find free-variable ~a in ~a" s id-env)))) free-vars)
+                    (map (lambda: ((s : unique)) (hash-ref id-env s (lambda () (error 'lift "Cannot find free-variable ~a in ~a" s id-env)))) free-vars)
                     body)
                    env)))))))))))
           (values (lifted:bind-rec closures body) env)))))
@@ -110,7 +111,7 @@
    (else (error 'lift "Not yet implemented ~a" expr))))
 
  (let-values (((expr env)
-               (lift expr (ann (make-immutable-hash empty) (HashTable Symbol type))
+               (lift expr (ann (make-immutable-hash empty) (HashTable unique type))
                           (ann (make-immutable-hash empty) lift-environment))))
   (lifted:lifted-program
     env

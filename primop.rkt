@@ -3,7 +3,7 @@
 (provide (except-out (all-defined-out) make-runtime-primop))
 
 (require racket/match racket/list)
-(require "types.rkt" "external-functions.rkt")
+(require "types.rkt" "external-functions.rkt" "unique.rkt")
 
 
 (define-type primop
@@ -34,7 +34,7 @@
 (define-struct: equality-primop ((equality : Boolean) (type : type)) #:transparent)
 (define-struct: unit-primop () #:transparent)
 (define-struct: call-closure-primop ((type : function-type)) #:transparent)
-(define-struct: call-known-function-primop ((type : function-type) (name : Symbol)) #:transparent)
+(define-struct: call-known-function-primop ((type : function-type) (name : unique)) #:transparent)
 (define-struct: call-known-runtime-primop ((type : function-type) (name : Symbol)) #:transparent)
 (define-struct: integer-constant-primop ((val : Integer)) #:transparent)
 (define-struct: string-constant-primop ((val : String)) #:transparent)

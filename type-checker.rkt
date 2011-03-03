@@ -1,7 +1,7 @@
 #lang typed/racket/base
 
 (require racket/match racket/list)
-(require "source-ast.rkt" "core-ast.rkt" "environment.rkt" "external-functions.rkt")
+(require "source-ast.rkt" "core-ast.rkt" "environment.rkt" "external-functions.rkt" "unique.rkt")
 (require
  (only-in "types.rkt"
   string-type int-type unit-type 
@@ -20,17 +20,22 @@
 (define-type value-type (U String-Type Int-Type compound-type))
 
 
+(: assert-unique (Any -> unique))
+(define (assert-unique v)
+ (unless (unique? v) (eprintf "Assert unique failed in typecheck with ~a~n" v))
+ (assert v unique?))
+
 
 
 (struct: type-environment
- ((ids : (HashTable Symbol value-type))
-  (types : (HashTable Symbol value-type))) #:transparent)
+ ((ids : (HashTable unique value-type))
+  (types : (HashTable unique value-type))) #:transparent)
 
 
 (: global-type-environment type-environment)
 (define global-type-environment
- (let* ((string (type-reference 'string))
-        (int (type-reference 'int))
+ (let* ((string (type-reference (hash-ref global-type-names 'string)))
+        (int (type-reference (hash-ref global-type-names 'int)))
         (extract-name (lambda (ty)
          (cond ((int-type? ty) int) ((string-type? ty) string) (else (error 'extract-name)))))
         (extract-name2 (lambda (ty)
@@ -39,14 +44,14 @@
    (make-immutable-hash
     (hash-map external-function-database
      (lambda: ((key : Symbol) (val : other:function-type))
-      (cons key
+      (cons (hash-ref global-id-names key)
             (function-type (map extract-name (other:function-type-arg-types val))
                            (extract-name2 (other:function-type-return-type val))))))
     )
    (make-immutable-hash
     (list
-     (cons 'int int-type)
-     (cons 'string string-type))))))
+     (cons (hash-ref global-type-names 'int) int-type)
+     (cons (hash-ref global-type-names 'string) string-type))))))
 
 
 
@@ -54,7 +59,7 @@
 (define (unresolve-type type type-env)
  (let/ec: escape : type-reference
   (hash-for-each (type-environment-types type-env)
-   (lambda: ((name : Symbol) (atype : value-type))
+   (lambda: ((name : unique) (atype : value-type))
     (when (equal? atype type) (escape (type-reference name)))))
   (error 'unresolve-type "No name for type ~a in ~a" type type-env)))
 
@@ -63,7 +68,7 @@
 (define (resolve-type type env)
  (if (type-reference? type)
      (let ((sym (type-reference-name type)))
-      (hash-ref (type-environment-types env) sym
+      (hash-ref (type-environment-types env) (assert-unique sym)
        (lambda ()
         (error 'resolve-type "Unbound type name ~a in ~a" sym env))))
      type))
@@ -120,7 +125,7 @@
 (define (function-declaration->function-type dec)
  (match dec
   ((function-declaration name args type body)
-   (function-type (map (inst cdr Symbol type-reference) args) type))))
+   (function-type (map (inst cdr (U Symbol unique) type-reference) args) type))))
 
 
 
@@ -197,7 +202,7 @@
             ((equal? 'nil type1)
              (error 'type-check "Expression has nil-type and cannot be assigned a type" rec-expr1))
             (else
-             (values (binder (list (variable-declaration (gensym 'ignored) (unresolve-type type1 env) rec-expr1)) rec-expr2) type2))))))
+             (values (binder (list (variable-declaration (gen-uniq 'ignored) (unresolve-type type1 env) rec-expr1)) rec-expr2) type2))))))
      (cond 
       ((empty? exprs) (values (sequence empty) unit-type))
       (else (rec exprs))))
@@ -247,7 +252,7 @@
                    (andmap (lambda: ((t1 : (U type-reference type)) (t2 : pos-type)) (type-equal? t1 t2 env))
                                        fun-arg-types
                                        arg-types))
-              (let ((fun-type-name (gensym 'fun-type)))
+              (let ((fun-type-name (gen-uniq 'fun-type)))
                (values (binder (list (type-declaration fun-type-name (function-type fun-arg-types fun-return-type)))
                                (function-call fun args (type-reference fun-type-name)))
                        (if fun-return-type
@@ -381,14 +386,14 @@
                                 (values (Listof function-declaration) type-environment)))
   (define (fix-function-declarations decs env)
    (let ((env (add-identifiers
-          (map (inst cons Symbol value-type)
+          (map (inst cons (U Symbol unique) value-type)
                (map function-declaration-name decs)
                (map function-declaration->function-type decs)) env)))
      (: fix-function-declaration (function-declaration -> function-declaration))
      (define (fix-function-declaration dec)
       (match dec
        ((function-declaration name args type body)
-        (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
+        (let ((args-typed (map (lambda: ((pair : (Pair (U Symbol unique) type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
          (let ((body ((search type (add-identifiers args-typed env)) body)))
           (function-declaration name args type body))))))
 
@@ -464,7 +469,7 @@
      ((break) prog)
      ((type-declaration name type) prog)
      ((function-declaration name args return-type body)
-      (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference)))
+      (let ((args-typed (map (lambda: ((pair : (Pair (U Symbol unique) type-reference)))
                               (cons (car pair) (resolve-type (cdr pair) env))) args)))
        (function-declaration name args return-type
         (let ((env (add-identifiers args-typed env)))
@@ -532,9 +537,9 @@
 
 
  
- (: lookup-identifier-type (Symbol type-environment -> value-type))
+ (: lookup-identifier-type ((U Symbol unique) type-environment -> value-type))
  (define (lookup-identifier-type sym env)
-  (hash-ref (type-environment-ids env) sym
+  (hash-ref (type-environment-ids env) (assert-unique sym)
    (lambda ()
     (error 'lookup-identifier "Unbound Identifier ~a in ~a" sym env))))
 
@@ -542,26 +547,26 @@
  (define (resolve-type* env)
   (lambda: ((t : type-reference)) (resolve-type t env)))
 
- (: add-identifier (Symbol value-type type-environment -> type-environment))
+ (: add-identifier ((U Symbol unique) value-type type-environment -> type-environment))
  (define (add-identifier sym type env)
   (match env
    ((type-environment ids types)
-    (type-environment (hash-set ids sym type) types ))))
+    (type-environment (hash-set ids (assert-unique sym) type) types ))))
 
 
- (: add-type (Symbol value-type type-environment -> type-environment))
+ (: add-type ((U Symbol unique) value-type type-environment -> type-environment))
  (define (add-type sym type env)
   (match env
    ((type-environment ids types)
-    (type-environment ids (hash-set types sym type)))))
+    (type-environment ids (hash-set types (assert-unique sym) type)))))
 
 
 
- (: add-identifiers ((Listof (Pair Symbol value-type)) type-environment -> type-environment))
+ (: add-identifiers ((Listof (Pair (U Symbol unique) value-type)) type-environment -> type-environment))
  (define (add-identifiers syms env)
   (for/fold: : type-environment
    ((env : type-environment env))
-   ((sym : (Pair Symbol value-type) syms))
+   ((sym : (Pair (U Symbol unique) value-type) syms))
    (add-identifier (car sym) (cdr sym) env)))
 
  (: extend-environment ((Listof declaration) type-environment -> (values (Listof declaration) type-environment)))
@@ -602,14 +607,14 @@
  (: check-function-declarations ((Listof function-declaration) type-environment -> (values (Listof function-declaration) type-environment)))
  (define (check-function-declarations decs env)
   (let ((env (add-identifiers
-         (map (inst cons Symbol value-type)
+         (map (inst cons (U Symbol unique) value-type)
               (map function-declaration-name decs)
               (map function-declaration->function-type decs)) env)))
     (: fix-function-declaration (function-declaration -> function-declaration))
     (define (fix-function-declaration dec)
      (match dec
       ((function-declaration name args type body)
-       (let ((args-typed (map (lambda: ((pair : (Pair Symbol type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
+       (let ((args-typed (map (lambda: ((pair : (Pair (U Symbol unique) type-reference))) (cons (car pair) (resolve-type (cdr pair) env))) args)))
         (let-values (((body b-type) ((type-check (add-identifiers args-typed env)) body)))
          (if (if type (type-equal? b-type type env)
                  (unit-type? b-type))
@@ -622,7 +627,7 @@
 
  (: check-type-declarations ((Listof type-declaration) type-environment -> (values (Listof type-declaration) type-environment)))
  (define (check-type-declarations types env)
-  (define-type dag (HashTable Symbol (U Symbol #f)))
+  (define-type dag (HashTable unique (U unique #f)))
 
   (: simplify-function-types ((Listof type-declaration) -> (Listof type-declaration)))
   (define (simplify-function-types types)
@@ -632,8 +637,8 @@
       ((type-declaration name ty)
        (match ty
         ((function-type args return-type)
-         (let ((return-name (gensym 'return))
-               (arg-names (map (lambda (_) (gensym 'arg)) args)))
+         (let ((return-name (gen-uniq 'return))
+               (arg-names (map (lambda (_) (gen-uniq 'arg)) args)))
           (: add-return ((Listof type-declaration) -> (Listof type-declaration)))
           (define (add-return decls)
            (if return-type (cons (type-declaration return-name return-type) decls) decls))
@@ -655,12 +660,12 @@
         (compute-reference-dag types 
          (match type
           ((type-reference ref-name)
-           (hash-set dag name ref-name))
-          (else (hash-set dag name #f))))))))))
+           (hash-set dag (assert-unique name) (assert-unique ref-name)))
+          (else (hash-set dag (assert-unique name) #f))))))))))
 
-  (: cycle-exists? (Symbol dag -> Boolean))
+  (: cycle-exists? (unique dag -> Boolean))
   (define (cycle-exists? symbol a-dag)
-   (: recur (Symbol dag (HashTable Symbol #t) -> Boolean))
+   (: recur (unique dag (HashTable unique #t) -> Boolean))
    (define (recur symbol dag visited)
     (if (hash-has-key? visited symbol)
         #t
@@ -669,12 +674,12 @@
              (recur sym dag (hash-set visited symbol #t))))))
    (recur symbol a-dag (make-immutable-hash empty)))
 
-  (: make-table ((Listof type-declaration) -> (HashTable Symbol type-declaration)))
+  (: make-table ((Listof type-declaration) -> (HashTable unique type-declaration)))
   (define (make-table decls)
-   (make-immutable-hash (map (inst cons Symbol type-declaration) (map type-declaration-name decls) decls)))
+   (make-immutable-hash (map (inst cons unique type-declaration) (map assert-unique (map type-declaration-name decls)) decls)))
 
 
-  (: make-ordered (dag (Listof type-declaration) (HashTable Symbol type-declaration) -> (Listof type-declaration)))
+  (: make-ordered (dag (Listof type-declaration) (HashTable unique type-declaration) -> (Listof type-declaration)))
   (define (make-ordered dag types table)
    (: recur (type-declaration (Listof type-declaration) -> (Listof type-declaration)))
    (define (recur dec acc)
@@ -683,7 +688,7 @@
         (cons dec
          (match dec
           ((type-declaration name ty)
-           (let ((ref (hash-ref dag name (lambda () #f))))
+           (let ((ref (hash-ref dag (assert-unique name) (lambda () #f))))
             (if ref
                 (let ((next-dec (hash-ref table ref (lambda () #f))))
                  (if next-dec (recur next-dec acc) acc))
@@ -708,7 +713,7 @@
            (or result 
             (match dec
              ((type-declaration name ty)
-              (cycle-exists? name reference-dag)))))))
+              (cycle-exists? (assert-unique name) reference-dag)))))))
    (when cycle
     (error 'type-check "Cycle in type declarations ~a" types))
    (: ordered (Listof type-declaration))

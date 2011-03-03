@@ -8,6 +8,7 @@
 (require "lifted-ast.rkt"
          "types.rkt" 
          "primop.rkt"
+         "unique.rkt"
          "external-functions.rkt"
          "code-gen-types.rkt"
          "code-gen-external-functions.rkt")
@@ -42,7 +43,7 @@
      (values name
       (llvm-add-function
        (convert-function-type (lifted-function-type fun-desc))
-       (symbol->string name))))
+       (symbol->string (unique->symbol name)))))
     ext-functions))
 
      

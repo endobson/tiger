@@ -3,21 +3,21 @@
 (require racket/match racket/list)
 (require (prefix-in ir: "ir-ast.rkt")
          (prefix-in inter: "intermediate-ast.rkt")
-         "types.rkt")
+         "types.rkt" "unique.rkt")
 
 (provide transform)
 
-(: transform-functions ((Listof (Pair Symbol inter:function)) -> (Listof (Pair Symbol ir:function))))
+(: transform-functions ((Listof (Pair unique inter:function)) -> (Listof (Pair unique ir:function))))
 (define (transform-functions funs)
- (map (inst cons Symbol ir:function)
-   (map (inst car Symbol inter:function) funs)
+ (map (inst cons unique ir:function)
+   (map (inst car unique inter:function) funs)
    (map transform-function funs)))
 
-(: transform-function ((Pair Symbol inter:function) -> ir:function))
+(: transform-function ((Pair unique inter:function) -> ir:function))
 (define (transform-function pair)
  (match (cdr pair)
   ((inter:function args ty body)
-   (ir:function (gensym (car pair)) args ty (transform body)))))
+   (ir:function (re-uniq (car pair)) args ty (transform body)))))
 
 (: transform (inter:expression -> ir:expression))
 (define (transform expr)

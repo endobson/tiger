@@ -2,18 +2,32 @@
 
 (require racket/match racket/list)
 
-(require "source-ast.rkt" "core-ast.rkt" "environment.rkt")
+(require "source-ast.rkt" "core-ast.rkt" "environment.rkt" "unique.rkt")
 
 (provide
+ global-environment
  rename-variables
  break-check)
 
 
 
 
+(: assert-symbol (Any -> Symbol))
+(define (assert-symbol v)
+ (assert v symbol?))
 
 
 
+
+(struct: environment
+ ((ids : (HashTable Symbol unique))
+  (types : (HashTable Symbol unique))) #:transparent)
+
+(: global-environment environment)
+(define global-environment
+ (environment
+  global-id-names
+  global-type-names))
 
 
 (: rename-variables (expression environment -> expression))
@@ -80,48 +94,50 @@
        
   recur)
  
- (: lookup-identifier (Symbol environment -> Symbol))
+ (: lookup-identifier ((U Symbol unique) environment -> unique))
  (define (lookup-identifier sym env)
-  (hash-ref (environment-ids env) sym
+  (hash-ref (environment-ids env) (assert-symbol sym)
    (lambda ()
     (error 'lookup-identifier "Unbound Identifier ~a in ~a" sym env))))
 
 
- (: lookup-type (Symbol environment -> Symbol))
+ (: lookup-type ((U Symbol unique) environment -> unique))
  (define (lookup-type sym env)
-  (hash-ref (environment-types env) sym
+  (hash-ref (environment-types env) (assert-symbol sym)
    (lambda ()
-    (error 'lookup-identifier "Unbound Identifier ~a" sym))))
+    (error 'lookup-type "Unbound type ~a" sym))))
 
 
- (: add-identifier (Symbol environment -> environment))
+ (: add-identifier ((U Symbol unique) environment -> environment))
  (define (add-identifier sym env)
-  (match env
-   ((environment id type)
-    (environment (hash-set id sym (gensym sym)) type))))
+  (let ((sym (assert-symbol sym)))
+   (match env
+    ((environment id type)
+     (environment (hash-set id sym (gen-uniq sym)) type)))))
 
 
- (: add-type (Symbol environment -> environment))
+ (: add-type ((U Symbol unique) environment -> environment))
  (define (add-type sym env)
-  (match env
-   ((environment id type)
-    (environment id (hash-set type sym (gensym sym))))))
+  (let ((sym (assert-symbol sym)))
+   (match env
+    ((environment id type)
+     (environment id (hash-set type sym (gen-uniq sym)))))))
 
 
 
- (: add-identifiers ((Listof Symbol) environment -> environment))
+ (: add-identifiers ((Listof (U Symbol unique)) environment -> environment))
  (define (add-identifiers syms env)
   (for/fold: : environment
    ((env : environment env))
-   ((sym : Symbol syms))
+   ((sym : (U Symbol unique) syms))
    (add-identifier sym env)))
 
 
- (: add-types ((Listof Symbol) environment -> environment))
+ (: add-types ((Listof (U Symbol unique)) environment -> environment))
  (define (add-types syms env)
   (for/fold: : environment
    ((env : environment env))
-   ((sym : Symbol syms))
+   ((sym : (U Symbol unique) syms))
    (add-type sym env)))
 
 
@@ -163,14 +179,14 @@
      (map (lambda: ((dec : function-declaration))
       (match dec
        ((function-declaration name args type body)
-        (let ((arg-names (map (inst car Symbol type-reference) args))
-              (arg-types (map (inst cdr Symbol type-reference) args)))
+        (let ((arg-names (map (inst car (U Symbol unique) type-reference) args))
+              (arg-types (map (inst cdr (U Symbol unique) type-reference) args)))
          (let ((inner-env (add-identifiers arg-names env)))
-          (let ((arg-names (map (lambda: ((name : Symbol)) (lookup-identifier name inner-env)) arg-names)))
+          (let ((arg-names (map (lambda: ((name : (U Symbol unique))) (lookup-identifier name inner-env)) arg-names)))
            (let ((recur (rename inner-env)))
             (function-declaration 
              (lookup-identifier name env)
-             (map (inst cons Symbol type-reference)
+             (map (inst cons (U Symbol unique) type-reference)
                arg-names
                (map recur arg-types))
              (and type (recur type))

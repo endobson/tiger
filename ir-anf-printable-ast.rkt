@@ -2,6 +2,7 @@
 
 (require racket/match)
 (require
+ "unique.rkt"
  (only-in "types.rkt" type record-type-fields)
  (rename-in "ir-anf-ast.rkt" (expression ir:expression))
  (rename-in "primop.rkt" (primop primop:primop)))
@@ -47,10 +48,10 @@
 (define (ir->printable ir)
  (match ir
   ((conditional c t f ty)
-   (list 'if c (ir->printable t) (ir->printable f)))
+   (list 'if (unique->symbol c) (ir->printable t) (ir->printable f)))
   ((bind-primop var type op args body)
-   (list 'let (list var ((inst cons primop (Listof Symbol)) (primop->printable op) args)) (ir->printable body)))
-  ((return name) name)
+   (list 'let (list (unique->symbol var) ((inst cons primop (Listof Symbol)) (primop->printable op) (map unique->symbol args))) (ir->printable body)))
+  ((return name) (unique->symbol name))
   ((bind-rec funs body)
    (list 'letrec (map function->printable funs) (ir->printable body)))
   (else (error 'ir->printable "Not handled ~a" ir))))
@@ -63,7 +64,7 @@
   ((equality-primop eql ty) (if eql '= '<>))
   ((unit-primop) 'unit)
   ((call-closure-primop ty) 'call)
-  ((call-known-function-primop ty name) (list 'call-known name))
+  ((call-known-function-primop ty name) (list 'call-known (unique->symbol name)))
   ((call-known-runtime-primop ty name) (list 'call-runtime name))
   ((integer-constant-primop v) v)
   ((string-constant-primop v) v)
@@ -80,9 +81,9 @@
   ((create-record-primop ty) (cons 'create-record (map (inst car Symbol type) (record-type-fields ty))))
   (else (error 'primop->printable "Not handled ~a" op))))
 
-(: function->printable ((Pair Symbol function) -> function-declaration))
+(: function->printable ((Pair unique function) -> function-declaration))
 (define (function->printable pair)
- (list (car pair)
+ (list (unique->symbol (car pair))
   (match (cdr pair)
    ((function name args return body)
-    (list 'function name (map (inst car Symbol type) args) (ir->printable body))))))
+    (list 'function (unique->symbol name) (map unique->symbol (map (inst car unique type) args)) (ir->printable body))))))

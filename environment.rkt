@@ -1,40 +1,39 @@
 #lang typed/racket/base
 
 
-(require "core-ast.rkt" racket/list)
+(require "unique.rkt")
 
-(provide
- environment
- environment-ids
- environment-types
-
- global-environment)
-
-
-(struct: environment
- ((ids : (HashTable Symbol Symbol))
-  (types : (HashTable Symbol Symbol))) #:transparent)
+(provide global-id-names global-type-names)
 
 
 
 
-
-(: global-environment environment)
-(define global-environment
- (environment
-  (make-immutable-hash
-   '((print . print)
-     (flush . flush)
-     (getchar . getchar)
-     (ord . ord)
-     (chr . chr)
-     (size . size)
-     (substring . substring)
-     (concat . concat)
-     (not . not)
-     (exit . exit)))
-  (make-immutable-hash
-   '((int . int) (string . string)))))
+(: names->map ((Listof Symbol) -> (HashTable Symbol unique)))
+(define (names->map names)
+ (make-immutable-hash
+  (map (inst cons Symbol unique) names (map gen-uniq names))))
 
 
+(: global-id-names (HashTable Symbol unique))
+(define global-id-names
+ (names->map
+   '(print
+     flush
+     getchar
+     ord
+     chr
+     size
+     substring
+     concat
+     not
+     exit
+     int
+     string)))
+
+
+
+(: global-type-names (HashTable Symbol unique))
+(define global-type-names
+ (names->map
+   '(int string)))
 

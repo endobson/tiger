@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require "intermediate-ast.rkt" "types.rkt" "primop.rkt")
+(require "intermediate-ast.rkt" "types.rkt" "primop.rkt" "unique.rkt")
 (require racket/match racket/list)
 
 (provide remove-assignment)
@@ -16,7 +16,7 @@
 
 (: remove-assignment (expression -> expression))
 (define (remove-assignment prog)
- (define-type set  (HashTable Symbol type))
+ (define-type set  (HashTable unique type))
  (: find-mutated (expression -> set))
  (define (find-mutated expr)
   (: empty-hash set)
@@ -46,20 +46,20 @@
        (hash-ref bound name
         (lambda () (error 'remove-assignment "Unbound identifier ~a in ~a" name bound)))))
      (else (error 'remove-assignment "Fix has a missing case"))))
-   (: fun-recur ((Listof (Pair Symbol function)) -> (values set set)))
+   (: fun-recur ((Listof (Pair unique function)) -> (values set set)))
    (define (fun-recur pairs)
-    (let* ((syms (map (inst car Symbol function) pairs))
-           (funs (map (inst cdr Symbol function) pairs))
+    (let* ((syms (map (inst car unique function) pairs))
+           (funs (map (inst cdr unique function) pairs))
            (bound (for/fold: : set
                     ((bound : set bound))
-                    ((sym : Symbol syms) (fun : function funs))
+                    ((sym : unique syms) (fun : function funs))
                    (hash-set bound sym (function->function-type fun))))
            (hashes (map (lambda: ((fun : function))
                          (match fun
                           ((function args return body)
                            ((search (for/fold: : set
                                       ((bound : set bound))
-                                      ((arg : (Pair Symbol type) args))
+                                      ((arg : (Pair unique type) args))
                                      (hash-set bound (car arg) (cdr arg)))) body))))
                         funs)))
      (values bound (apply hash-union empty-hash hashes))))
@@ -99,24 +99,24 @@
      (primop-expr (box-set!-primop (make-box-type ty)) (list (identifier name) (fix val)))))
    (else (error 'remove-assignment "Fix has a missing case"))))
 
- (: fix-function ((Pair Symbol function) -> (Pair Symbol function)))
+ (: fix-function ((Pair unique function) -> (Pair unique function)))
  (define (fix-function pair)
   (let ((fun (cdr pair)))
    (cons (car pair) 
     (match fun
      ((function args ty body)
-      (let* ((arg-names (map (inst car Symbol type) args))
-             (arg-types (map (inst cdr Symbol type) args))
-             (mut-args (map (lambda: ((sym : Symbol))
+      (let* ((arg-names (map (inst car unique type) args))
+             (arg-types (map (inst cdr unique type) args))
+             (mut-args (map (lambda: ((sym : unique))
                              (and (hash-has-key? mutated sym)
-                                  (gensym sym))) arg-names))
-             (new-arg-names (map (lambda: ((new : (Option Symbol)) (old : Symbol))
+                                  (re-uniq sym))) arg-names))
+             (new-arg-names (map (lambda: ((new : (Option unique)) (old : unique))
                                   (or new old)) mut-args arg-names)))
-       (function (map (inst cons Symbol type) new-arg-names arg-types) ty
+       (function (map (inst cons unique type) new-arg-names arg-types) ty
         (for/fold: : expression
           ((expr : expression body))
-          ((new : (Option Symbol) mut-args)
-           (old : Symbol arg-names)
+          ((new : (Option unique) mut-args)
+           (old : unique arg-names)
            (ty : type arg-types))
          (if new
           (let ((new-ty (make-box-type ty)))

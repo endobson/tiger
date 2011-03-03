@@ -14,7 +14,7 @@
    ((bind-rec funs body)
     (if (empty? funs) (recur body)
         (bind-rec
-         (map (lambda: ((p : (Pair Symbol function)))
+         (map (lambda: ((p : (Pair unique function)))
           (cons (car p)
            (match (cdr p)
             ((function name args ret body)

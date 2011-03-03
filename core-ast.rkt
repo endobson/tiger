@@ -2,13 +2,13 @@
 
 (provide (all-defined-out))
 
-
+(require "unique.rkt")
 
 
 (define-type compound-type (U array-type record-type function-type))
 
 
-(define-struct: type-reference ((name : Symbol)) #:transparent)
+(define-struct: type-reference ((name : (U Symbol unique))) #:transparent)
 (define-struct: array-type ((elem-type : type-reference)))
 (define-struct: record-type ((fields : (Listof (Pair Symbol type-reference)))))
 (define-struct: function-type ((args : (Listof (U compound-type type-reference))) (return : (U #f compound-type type-reference))) #:transparent)

@@ -8,10 +8,10 @@
 
 (: remove-unused-variable-bindings (expression -> expression))
 (define (remove-unused-variable-bindings expr)
- (: counts (HashTable Symbol Natural))
+ (: counts (HashTable unique Natural))
  (define counts (make-hash))
 
- (: update-count (Symbol -> Void))
+ (: update-count (unique -> Void))
  (define (update-count name)
   (hash-update! counts name add1
    (lambda () (error 'remove-unused-variable-bindings "Unbound identifier ~a in ~a" name counts))))
@@ -32,13 +32,13 @@
          expr
          (bind-primop var ty op args expr))))
    ((bind-rec funs body)
-    (for: ((p : (Pair Symbol function) funs))
+    (for: ((p : (Pair unique function) funs))
      (hash-set! counts (car p) 0)
      (hash-set! counts (function-name (cdr p)) 0)
-     (for: ((arg : (Pair Symbol Any) (function-args (cdr p))))
+     (for: ((arg : (Pair unique Any) (function-args (cdr p))))
       (hash-set! counts (car arg) 0)))
     (bind-rec
-     (map (lambda: ((p : (Pair Symbol function)))
+     (map (lambda: ((p : (Pair unique function)))
       (cons (car p)
        (match (cdr p)
         ((function name args ret body)
