@@ -13,6 +13,7 @@
  "ir-anf-printable-ast.rkt"
  "types.rkt"
  "optimization/inline-one-use.rkt"
+ "optimization/inline-trivial.rkt"
  "optimization/remove-empty-bind-rec.rkt"
  "optimization/remove-unused-variable-bindings.rkt"
  "optimization/known-function-optimization.rkt"
@@ -79,11 +80,13 @@
 (define (optimize ir)
  (define (simple-optimize ir)
   (let ((ir (remove-units ir)))
-   (let ((ir (inline-tail-once-used ir)))
-    (let ((ir (remove-empty-bind-rec ir)))
-     (let ((ir (remove-unused-variable-bindings ir)))
-      (let ((ir (known-function-optimization ir)))
-       ir))))))
+   (let ((ir (inline-once-used ir)))
+    (let ((ir (inline-trivial ir)))
+     (let ((ir (remove-empty-bind-rec ir)))
+      (let ((ir (remove-unused-variable-bindings ir)))
+       (let ((ir (known-function-optimization ir)))
+       ;(ir:type-check ir)
+       ir)))))))
 
  (let loop ((ir ir))
   (let ((new-ir (simple-optimize ir)))

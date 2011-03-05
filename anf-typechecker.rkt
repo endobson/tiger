@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require "types.rkt" "ir-anf-ast.rkt" "primop.rkt")
+(require "types.rkt" "ir-anf-ast.rkt" "primop.rkt" "ir-anf-printable-ast.rkt")
 
 (require racket/list racket/match)
 
@@ -23,7 +23,7 @@
   (define (expr-type-assert expr expected)
    (let ((actual (recur expr)))
     (unless (equal? actual expected)
-     (error 'type-check "Expression ~a has type ~a. Expected ~a." expr actual expected))))
+     (error 'type-check "Expression ~a has type ~a. Expected ~a." (anf->printable expr) actual expected))))
 
 
   (: assert (Boolean String -> Void))
