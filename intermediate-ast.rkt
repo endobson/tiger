@@ -7,6 +7,10 @@
 
 (provide (all-defined-out) unique)
 
+
+
+(struct: program ((expr : expression) (type : type)) #:transparent)
+
 (define-type expression
  (U identifier primop-expr conditional bind bind-rec while-loop for-loop break assignment))
 

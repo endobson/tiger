@@ -78,11 +78,12 @@
 
 (define (optimize ir)
  (define (simple-optimize ir)
-  (let ((ir (inline-tail-once-used ir)))
-   (let ((ir (remove-empty-bind-rec ir)))
-    (let ((ir (remove-unused-variable-bindings ir)))
-     (let ((ir (known-function-optimization ir)))
-      ir)))))
+  (let ((ir (remove-units ir)))
+   (let ((ir (inline-tail-once-used ir)))
+    (let ((ir (remove-empty-bind-rec ir)))
+     (let ((ir (remove-unused-variable-bindings ir)))
+      (let ((ir (known-function-optimization ir)))
+       ir))))))
 
  (let loop ((ir ir))
   (let ((new-ir (simple-optimize ir)))

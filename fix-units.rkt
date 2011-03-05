@@ -29,7 +29,7 @@
     ((identifier name) (if (hash-has-key? env name) unit expr))
     ((primop-expr op args)
      (match op
-      ((call-closure-primop ty)
+      ((or (call-closure-primop ty) (call-known-function-primop ty _))
        (let* ((arg-types (function-type-arg-types ty))
               (unit-slots (map unit-type? arg-types))
               (has-unit (ormap (inst values Boolean) unit-slots))

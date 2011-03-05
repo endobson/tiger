@@ -120,6 +120,7 @@
                (cont (anf:return (pos-rename return))))))))
 
 
-  (top-process expr ty))
+  (let ((ign (gen-uniq 'ignored)))
+   (top-process (inter:bind ign ty expr (inter:primop-expr (unit-primop) empty)) unit-type)))
   
 

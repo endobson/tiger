@@ -4,6 +4,8 @@
 (require "primop.rkt" "types.rkt" "unique.rkt")
 
 
+(struct: program ((expr : expression) (type : type)) #:transparent)
+
 (define-type expression (U return conditional bind-primop bind-rec))
 
 (struct: return ((name : unique)) #:transparent)
