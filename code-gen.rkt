@@ -5,7 +5,7 @@
  (planet endobson/llvm/llvm)) 
 
 (require racket/match racket/list unstable/hash)
-(require "lifted-ast.rkt"
+(require "lifted-anf-ast.rkt"
          "types.rkt" 
          "primop.rkt"
          "unique.rkt"
@@ -26,23 +26,30 @@
  (define context (LLVMContextCreate))
  (define module (llvm-create-module "program" #:context context))
  (enter-module/32 context module
+
+
+
+
+  (define-values (ext-functions ext-closures) (add-external-functions))
+
   (define main-function
+    (llvm-add-function
+     (llvm-function-type (llvm-void-type))
+     "tiger_main"))
+  (define real-main-function
     (llvm-add-function
      (llvm-function-type (llvm-int-type)
       (llvm-int-type) (llvm-pointer-type (llvm-pointer-type (llvm-int8-type))))
      "main"))
 
 
-
-
-  (define-values (ext-functions ext-closures) (add-external-functions))
   (define function-descriptions (lifted-program-functions prog))
   (define all-functions 
    (hash-union
     (for/hash (((name fun-desc) function-descriptions))
      (values name
       (llvm-add-function
-       (convert-function-type (lifted-function-type fun-desc))
+       (convert-function-type (function->function-type fun-desc))
        (symbol->string (unique->symbol name)))))
     ext-functions))
 
@@ -55,7 +62,7 @@
 
   (for (((name fun-desc) function-descriptions))
    (match fun-desc
-    ((lifted-function fun-name type arg-names closed-names closed-types body)
+    ((function fun-name type arg-names closed-names closed-types body)
      (let* ((fun (hash-ref all-functions name))
             (block (llvm-add-block-to-function fun)))
       (llvm-set-position block)
@@ -66,17 +73,19 @@
                     (llvm-int-to-ptr
                      (llvm-load (llvm-gep (llvm-get-param 0) 0 1 i))
                      (convert-type arg-type))))))
-       (let ((val (compile-expr env info-env all-functions body)))
-        (if (unit-type? (function-type-return-type type))
-            (llvm-ret-void)
-            (llvm-ret val) )))))))
+        (compile-expr env info-env all-functions body (function-type-return-type type)))))))
 
 
 
   (define main-entry (llvm-add-block-to-function main-function #:name "entry"))
   (llvm-set-position main-entry)
-  (compile-expr global-environment info-env all-functions (lifted-program-expr prog))
+  (compile-expr global-environment info-env all-functions (lifted-program-expr prog) unit-type)
+
+  (define real-main-entry (llvm-add-block-to-function real-main-function #:name "entry"))
+  (llvm-set-position real-main-entry)
+  (llvm-call main-function)
   (llvm-ret 0)
+  
 
 
   )
@@ -97,7 +106,6 @@
 
 
 
-
   
   
 
@@ -111,44 +119,33 @@
 
 
 
-(define (compile-expr initial-env info-env fun-env expr)
+(define (compile-expr initial-env info-env fun-env expr full-expr-type)
  (define (compile env)
   (define (recur expr)
    (match expr
-    ((identifier id) (lookup-identifier id env))
-    ((bind id ty expr body)
-     (let ((expr-value (recur expr)))
-      ((compile (hash-set env id expr-value)) body)))
-    ((primop-expr op exprs)
-     (let ((vals (map recur exprs)))
-      (compile-primop op vals)))
-    ((sequence first rest)
-     (recur first) (recur rest))
+    ((return id) (llvm-smart-ret (lookup-identifier id env)))
+    ((bind-primop var ty op args expr)
+     (let ((vals (map (lambda (id) (lookup-identifier id env)) args)))
+      ((compile (hash-set env var (compile-primop op vals))) expr)))
     ((conditional c t f ty)
-     (let ((cv (recur c)))
+     (let ((cv (lookup-identifier c env)))
       (let ((cond (llvm-/= cv 0)))
-       (define-basic-block t-block f-block m-block)
+       (define-basic-block t-block f-block)
        (llvm-cond-br cond t-block f-block)
-       (let ((tv (begin (llvm-set-position t-block) (begin0 (recur t) (llvm-br m-block))))
-             (tfinal-block (llvm-get-insert-block))
-             (fv (begin (llvm-set-position f-block) (begin0 (recur f) (llvm-br m-block))))
-             (ffinal-block (llvm-get-insert-block)))
-        (llvm-set-position m-block)
-        (if (unit-type? ty)
-            #f
-            (let ((merged (llvm-phi (convert-type ty))))
-              (llvm-add-incoming merged (cons tv tfinal-block) (cons fv ffinal-block))
-              merged))))))
+       (llvm-set-position t-block)
+       (recur t)
+       (llvm-set-position f-block)
+       (recur f))))
     ((bind-rec funs body)
      (define closure-names (map car funs))
      (define fun-names (map (compose create-closure-function cdr) funs))
      (define closed-variables (map (compose create-closure-closed-variables cdr) funs))
      (define num-closed-variables (map length closed-variables))
      (define functions (map (lambda (name) (lookup-function name)) fun-names))
-     (define closed-types (map lifted-function-closed-variable-types functions))
+     (define closed-types (map function-closed-variable-types functions))
      (define llvm-fun-types
       (for/list ((f functions))
-       (match f ((lifted-function name type arg-names closed-names closed-types body) (convert-function-type type)))))
+       (match f ((function name type arg-names closed-names closed-types body) (convert-function-type type)))))
      (define closures
       (map (lambda (t n) (llvm-malloc (machine-closure-type t n))) llvm-fun-types num-closed-variables))
      (define zero-closures
@@ -164,10 +161,14 @@
        (for/list ((v vals) (i (in-naturals)) (type types))
         (llvm-store (int-cast v type info-env) (llvm-gep closure 0 1 i))))
 
-     ((compile inner-env) body))
-    (else
-     (error 'compile "Not yet implemented: ~a" expr))))
+     ((compile inner-env) body))))
   recur)
+
+
+ (define (llvm-smart-ret val)
+  (if (unit-type? full-expr-type)
+      (llvm-ret-void)
+      (llvm-ret val)))
 
 
  (define (compile-primop op vals)

@@ -4,7 +4,7 @@
 
 
 (require
-         (prefix-in lifted: "lifted-ast.rkt")
+         (prefix-in lifted: "lifted-anf-ast.rkt")
          (prefix-in ir: "ir-anf-ast.rkt")
          "unique.rkt"
          "types.rkt" )
@@ -53,9 +53,9 @@
  (recur expr))
        
 
-(: add-function (lifted:lifted-function lift-environment -> lift-environment))
+(: add-function (lifted:function lift-environment -> lift-environment))
 (define (add-function fun env)
- (hash-set env (lifted:lifted-function-name fun) fun))
+ (hash-set env (lifted:function-name fun) fun))
 
 
 
@@ -68,10 +68,10 @@
    (ir:expression id-environment lift-environment -> (values lifted:expression lift-environment)))
  (define (lift expr id-env env)
   (match expr
-   ((ir:return x) (values (lifted:identifier x) env))
+   ((ir:return x) (values (lifted:return x) env))
    ((ir:bind-primop var type op args body)
     (let*-values (((body env) (lift body (hash-set id-env var type) env)))
-     (values (lifted:bind var type (lifted:primop-expr op (map lifted:identifier args)) body) env)))
+     (values (lifted:bind-primop var type op args body) env)))
    ((ir:bind-rec closure-decs body)
     (let ((id-env
            (foldl (lambda: ((dec : (Pair unique ir:function)) (id-env : id-environment))
@@ -94,7 +94,7 @@
                  (values
                   (cons (cons name (lifted:create-closure fun-name free-vars)) closures)
                   (add-function
-                   (lifted:lifted-function
+                   (lifted:function
                     fun-name
                     (make-function-type arg-types ty)
                     arg-names
@@ -107,8 +107,7 @@
     (let*-values 
       (((t-branch env) (lift t-branch id-env env))
        ((f-branch env) (lift f-branch id-env env)))
-     (values (lifted:conditional (lifted:identifier cond) t-branch f-branch ty) env)))
-   (else (error 'lift "Not yet implemented ~a" expr))))
+     (values (lifted:conditional cond t-branch f-branch ty) env)))))
 
  (let-values (((expr env)
                (lift expr (ann (make-immutable-hash empty) (HashTable unique type))
