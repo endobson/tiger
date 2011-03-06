@@ -319,6 +319,7 @@
                      closure
                      args)))
    (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv)
+   (LLVMSetTailCall call-inst #t)
    call-inst))
 
 
@@ -327,6 +328,7 @@
                       (hash-ref fun-env function-name)
                       args)))
    (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv)
+   (LLVMSetTailCall call-inst #t)
    call-inst))
 
  (define (compile-known-runtime-call function-name args)
@@ -334,6 +336,7 @@
                       (hash-ref fun-env function-name)
                       args)))
    (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv)
+   (LLVMSetTailCall call-inst #t)
    call-inst))
 
 

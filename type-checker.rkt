@@ -73,6 +73,14 @@
         (error 'resolve-type "Unbound type name ~a in ~a" sym env))))
      type))
 
+(: sub-type? ((U type-reference type 'nil) (U type-reference type 'nil) type-environment -> Boolean))
+(define (sub-type? t1 t2 env)
+ (cond
+  ((type-reference? t1) (sub-type? (resolve-type t1 env) t2 env))
+  ((type-reference? t2) (sub-type? t1 (resolve-type t2 env) env))
+  ((equal? 'nil t1) (record-type? t2))
+  (else (type-equal? t1 t2 env))))
+
 (: type-equal? ((U type-reference type 'nil) (U type-reference type 'nil) type-environment -> Boolean))
 (define (type-equal? t1 t2 env)
  (cond
@@ -220,15 +228,23 @@
        (if (int-type? c-type)
         (let-values (((t t-type) (recur t))
                      ((f f-type) (if f (recur f) (values (sequence empty) unit-type))))
-         (if (type-equal? t-type f-type env)
-             (let ((r-type 
-                    (cond
-                     ((equal? t-type 'nil) 'nil)
-                     ((unit-type? t-type) 'unit)
-                     (else (unresolve-type t-type env)))))
-               (values (if-then-else c t f r-type) t-type))
-             (error 'type-check "The different branches of a conditional ~a and ~a have different types ~a and ~a"
-               t f t-type f-type)))
+         (: type-error (-> Nothing))
+         (define (type-error)
+          (error 'type-check "The different branches of a conditional ~a and ~a have different types ~a and ~a"
+                  t f t-type f-type))
+         (let-values (((r-type-ref r-type)
+                (cond
+                 ((equal? t-type 'nil)
+                  (cond 
+                   ((equal? f-type 'nil) (values 'nil 'nil))
+                   ((unit-type? f-type) (type-error))
+                   ((record-type? f-type) (values (unresolve-type f-type env) f-type))
+                   (else (type-error))))
+                 ((type-equal? t-type f-type env)
+                  (if (unit-type? t-type) (values 'unit unit-type)
+                      (values (unresolve-type t-type env) t-type)))
+                 (else (type-error)))))
+               (values (if-then-else c t f r-type-ref) r-type)))
         (error 'type-check "The condition of a conditional ~a had type ~a instead of type int" c c-type)))))
     ((integer-literal v) (values prog int-type))
     ((string-literal s) (values prog string-type))
@@ -249,7 +265,7 @@
        (match fun-type
         ((function-type fun-arg-types fun-return-type)
           (if (and (= (length fun-arg-types) (length arg-types))
-                   (andmap (lambda: ((t1 : (U type-reference type)) (t2 : pos-type)) (type-equal? t1 t2 env))
+                   (andmap (lambda: ((t1 : (U type-reference type)) (t2 : pos-type)) (sub-type? t2 t1 env))
                                        fun-arg-types
                                        arg-types))
               (let ((fun-type-name (gen-uniq 'fun-type)))
@@ -584,7 +600,7 @@
       ((variable-declaration name type value)
        (let-values (((value v-type) ((type-check env) value)))
         (let ((r-type (resolve-type type env)))
-        (if (type-equal? r-type v-type env)
+        (if (sub-type? v-type r-type env)
             (let-values (((decs env) (extend-environment (rest decs) (add-identifier name r-type env))))
              (values (cons (variable-declaration name type value) decs) env))
             (error 'type-check "Variable declaration type ~a does not match type of expression ~a" type v-type)))))
