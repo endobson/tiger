@@ -1,7 +1,8 @@
 #lang racket/base
 
 (require
- (planet endobson/llvm/llvm-simple))
+ (planet endobson/llvm/llvm-simple)
+ (planet endobson/llvm/llvm))
 
 
 (require racket/match racket/list)
@@ -22,6 +23,7 @@
 
  (define (make-closure funval type name)
   (define closure  (llvm-add-global (machine-closure-type type) name))
+  (LLVMSetLinkage closure 'LLVMPrivateLinkage)
   (llvm-set-initializer
    closure
    (llvm-struct funval (llvm-array (llvm-int-type))))
@@ -160,6 +162,10 @@
  
     (else (values name (error 'code-gen "External-function ~a not yet implemented" name))))))
  
+ (for (((name function) ext-functions))
+  (LLVMSetFunctionCallConv function 'LLVMFastCallConv)
+  (LLVMSetLinkage function 'LLVMPrivateLinkage))
+
  (define ext-closures
   (for/hash (((name function) ext-functions))
    (let ((type (hash-ref external-function-database name)) (closure-name (string-append (symbol->string name) "_closure")))

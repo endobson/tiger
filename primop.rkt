@@ -9,6 +9,7 @@
 (define-type primop
  (U math-primop
     unit-primop
+    undefined-primop
     call-closure-primop
     call-known-function-primop
     call-known-runtime-primop
@@ -33,6 +34,7 @@
 (define-struct: math-primop ((symbol : (U '+ '- '* '/ '<= '>= '< '> '& '\|))) #:transparent)
 (define-struct: equality-primop ((equality : Boolean) (type : type)) #:transparent)
 (define-struct: unit-primop () #:transparent)
+(define-struct: undefined-primop ((type : type)) #:transparent)
 (define-struct: call-closure-primop ((type : function-type)) #:transparent)
 (define-struct: call-known-function-primop ((type : function-type) (name : unique)) #:transparent)
 (define-struct: call-known-runtime-primop ((type : function-type) (name : Symbol)) #:transparent)
@@ -68,6 +70,7 @@
   ((integer-constant-primop n) (string->symbol (string-append "int-" (number->string n) "-val")))
   ((string-constant-primop str) (string->symbol (string-append "string-" (format "~s" str) "-val")))
   ((unit-primop) 'unit)
+  ((undefined-primop ty) 'undef)
   ((nil-primop ty) 'nil)
   ((runtime-primop ty name) name)
   ((math-primop op)
@@ -106,6 +109,7 @@
   ((string-constant-primop str) empty)
   ((unit-primop) empty)
   ((nil-primop ty) empty)
+  ((undefined-primop ty) empty)
   ((runtime-primop ty name) empty)
   ((math-primop sym)
    (list int-type int-type))

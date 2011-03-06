@@ -14,7 +14,7 @@
   ((string-constant-primop str) #f)
   ((unit-primop) #f)
   ((nil-primop ty) #f)
-  ((runtime-primop ty name) (side-effect)) ;Over approximation
+  ((runtime-primop ty name) #f) ;This just returns the primop
   ((call-known-runtime-primop ty name) (side-effect)) ;Over approximation
   ((math-primop sym) #f)
   ((equality-primop eql ty) #f)

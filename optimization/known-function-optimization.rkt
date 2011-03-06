@@ -28,7 +28,9 @@
             ((runtime-primop? fun)
              (match fun
               ((runtime-primop prim-ty name)
-               (bind-primop var ty (call-known-runtime-primop prim-ty name) args (recur expr)))))
+               (let ((undef (gen-uniq 'undef)))
+                (bind-primop undef prim-ty (undefined-primop prim-ty) empty
+                 (bind-primop var ty (call-known-runtime-primop prim-ty name) (cons undef (rest args)) (recur expr)))))))
             ((not fun) (normal))))))
      ((runtime-primop? op) 
       (hash-set! env var op)

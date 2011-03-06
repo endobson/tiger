@@ -15,6 +15,7 @@
    #:once-any
    ("--binary" "outputs the executable" (set! output-mode 'binary))
    ("--llvm" "outputs llvm bitcode" (set! output-mode 'llvm))
+   ("--llvm-opt" "outputs optimized llvm bitcode" (set! output-mode 'llvm-opt))
    ("--ir" "outputs ir representation" (set! output-mode 'ir))
    ("--lifted" "outputs lifted representation" (set! output-mode 'lifted))
    #:args (source-file)
@@ -32,13 +33,13 @@
 
 
 (define program
- (let ((mode (if (equal? 'binary output-mode) 'llvm output-mode)))
+ (let ((mode (if (equal? 'binary output-mode) 'llvm-opt output-mode)))
   (call-with-input-file source-path (lambda (port) (full-compile port mode)))))
 
 (if (equal? output-mode 'binary) (void (compile-llvm program (if (equal? destination-path 'default) "a.out" destination-path)))
  (set-output-file
   (case output-mode
-   ((llvm) (display (llvm-module-description program)))
+   ((llvm llvm-opt) (display (llvm-module-description program)))
    ((ir) (pretty-write (anf->printable program)))
    ((lifted) (pretty-write program)))))
 

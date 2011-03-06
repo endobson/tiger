@@ -20,6 +20,7 @@
   'box-ref
   'box-set!
   'unit
+  'undef
   Integer
   String
   'nil
@@ -63,6 +64,7 @@
   ((math-primop sym) sym)
   ((equality-primop eql ty) (if eql '= '<>))
   ((unit-primop) 'unit)
+  ((undefined-primop ty) 'undef)
   ((call-closure-primop ty) 'call)
   ((call-known-function-primop ty name) (list 'call-known (unique->symbol name)))
   ((call-known-runtime-primop ty name) (list 'call-runtime name))

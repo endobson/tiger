@@ -17,9 +17,9 @@
     (+ (recur expr)
      (match op
       ((unit-primop) 0)
+      ((undefined-primop ty) 0)
       ((integer-constant-primop n) 0)
       ((string-constant-primop str) 0)
-      ((unit-primop) 0)
       ((nil-primop ty) 0)
       ((runtime-primop ty name) 1)
       ((math-primop sym) 1)

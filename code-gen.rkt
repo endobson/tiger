@@ -4,7 +4,8 @@
  (planet endobson/llvm/llvm-simple)
  (planet endobson/llvm/llvm)) 
 
-(require racket/match racket/list unstable/hash)
+(require (for-syntax racket/base))
+(require racket/file racket/system racket/match racket/list unstable/hash)
 (require "lifted-anf-ast.rkt"
          "types.rkt" 
          "primop.rkt"
@@ -13,11 +14,33 @@
          "code-gen-types.rkt"
          "code-gen-external-functions.rkt")
 
-(provide compile-program write-program)
+(provide compile-program write-program optimize-llvm)
 
 
+(define-syntax (with-temporary-file stx)
+ (syntax-case stx ()
+  ((_ id body bodies ...)
+   #'(let ((id (make-temporary-file)))
+      (dynamic-wind
+       (let ((first #t)) (lambda () (if first (set! first #f) (error 'run-program "Re-entering protected region"))))
+       (lambda () body bodies ...)
+       (lambda ()
+        (when (file-exists? id)
+         (delete-file id))))))))
     
 
+(define (optimize-llvm program)
+ (with-temporary-file bitcode
+  (with-temporary-file opt-bitcode
+   (write-program program bitcode)
+   (system* "/usr/bin/env" "opt"
+            "-o" (path->string opt-bitcode) 
+            "-std-compile-opts"
+            (path->string bitcode))
+   (let ((buf (LLVMCreateMemoryBufferWithContentsOfFile opt-bitcode)))
+     (let ((module (LLVMParseBitcode buf)))
+      (LLVMDisposeMemoryBuffer buf)
+      module)))))
   
 
 
@@ -36,6 +59,8 @@
     (llvm-add-function
      (llvm-function-type (llvm-void-type))
      "tiger_main"))
+  (LLVMSetLinkage main-function 'LLVMPrivateLinkage)
+  (LLVMSetFunctionCallConv main-function 'LLVMFastCallConv)
   (define real-main-function
     (llvm-add-function
      (llvm-function-type (llvm-int-type)
@@ -65,6 +90,8 @@
     ((function fun-name type arg-names closed-names closed-types body)
      (let* ((fun (hash-ref all-functions name))
             (block (llvm-add-block-to-function fun)))
+      (LLVMSetFunctionCallConv fun 'LLVMFastCallConv)
+      (LLVMSetLinkage fun 'LLVMPrivateLinkage)
       (llvm-set-position block)
       (let* ((env (for/fold ((env global-environment)) ((arg-name arg-names) (i (in-naturals)))
                   (hash-set env arg-name (llvm-get-param (add1 i)))))
@@ -83,7 +110,8 @@
 
   (define real-main-entry (llvm-add-block-to-function real-main-function #:name "entry"))
   (llvm-set-position real-main-entry)
-  (llvm-call main-function)
+  (let ((call-inst (llvm-call main-function)))
+   (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv))
   (llvm-ret 0)
   
 
@@ -178,6 +206,7 @@
    ((string-constant-primop val) (compile-string-constant val))
    ((nil-primop type) (llvm-null (convert-type type)))
    ((unit-primop) #f)
+   ((undefined-primop type) (llvm-get-undef (convert-type type)))
    ((create-record-primop type) (compile-create-record (convert-type type) vals))
    ((create-box-primop type) (compile-create-box (convert-type type) (first vals)))
    ((create-array-primop type) (compile-create-array
@@ -285,21 +314,27 @@
       (else (error 'compile "Math operator ~a not yet implemented" op))) l r))
 
  (define (compile-closure-call closure args)
-   (llvm-call*
-    (llvm-load (llvm-gep closure 0 0))
-    closure
-    args))
+  (let ((call-inst (llvm-call*
+                     (llvm-load (llvm-gep closure 0 0))
+                     closure
+                     args)))
+   (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv)
+   call-inst))
 
 
  (define (compile-known-function-call function-name args)
-   (llvm-call*
-    (hash-ref fun-env function-name)
-    args))
+  (let ((call-inst  (llvm-call*
+                      (hash-ref fun-env function-name)
+                      args)))
+   (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv)
+   call-inst))
 
  (define (compile-known-runtime-call function-name args)
-   (llvm-call*
-    (hash-ref fun-env function-name)
-    args))
+  (let ((call-inst  (llvm-call*
+                      (hash-ref fun-env function-name)
+                      args)))
+   (LLVMSetInstructionCallConv call-inst 'LLVMFastCallConv)
+   call-inst))
 
 
  (define (lookup-identifier id env)

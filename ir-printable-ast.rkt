@@ -16,6 +16,7 @@
   'array-ref
   'array-set!
   'call
+  'undef
   'box-ref
   'box-set!
   'unit
@@ -67,6 +68,7 @@
   ((math-primop sym) sym)
   ((equality-primop eql ty) (if eql '= '<>))
   ((unit-primop) 'unit)
+  ((undefined-primop) 'undef)
   ((call-closure-primop ty) 'call)
   ((call-known-function-primop ty name) (list 'call-known name))
   ((call-known-runtime-primop ty name) (list 'call-runtime name))

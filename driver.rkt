@@ -101,6 +101,7 @@
 
 (define (full-compile s/p mode)
  (case mode
+  ((llvm-opt) (optimize-llvm (compile-program (lift (optimize (source->ir s/p))))))
   ((llvm) (compile-program (lift (optimize (source->ir s/p)))))
   ((lifted) (lift (optimize (source->ir s/p))))
   ((ir) (optimize (source->ir s/p)))
