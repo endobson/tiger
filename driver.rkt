@@ -25,7 +25,6 @@
 (require "anf-lifter.rkt" "code-gen.rkt")
 
 (require (prefix-in source->inter: "source-intermediate-transform.rkt"))
-(require (prefix-in inter->ir: "intermediate-ir-transform.rkt"))
 (require (prefix-in inter->anf: "intermediate-anf-transform.rkt"))
 
 (require racket/file racket/system racket/pretty)
