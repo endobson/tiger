@@ -60,7 +60,7 @@
  (let/ec: escape : type-reference
   (hash-for-each (type-environment-types type-env)
    (lambda: ((name : unique) (atype : value-type))
-    (when (equal? atype type) (escape (type-reference name)))))
+    (when (type-equal? atype type type-env) (escape (type-reference name)))))
   (error 'unresolve-type "No name for type ~a in ~a" type type-env)))
 
 

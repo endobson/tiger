@@ -12,7 +12,9 @@
  "fix-units-anf.rkt"
  "ir-anf-printable-ast.rkt"
  "types.rkt"
+ "unique.rkt"
  "optimization/inline-one-use.rkt"
+ "optimization/zero-cfa.rkt"
  "optimization/inline-trivial.rkt"
  "optimization/remove-empty-bind-rec.rkt"
  "optimization/remove-unused-variable-bindings.rkt"
@@ -93,6 +95,13 @@
        new-ir
        (loop new-ir)))))
 
+(define (analyze ir)
+ 
+ (let ((zcfa-results (zero-cfa ir)))
+  (for (((variable functions) zcfa-results))
+   (printf "~a: ~a~n" (unique->symbol variable) (hash-map functions (lambda (k t) (unique->symbol k))))))
+
+ ir)
 
 
 (define (source->ir s/p)
