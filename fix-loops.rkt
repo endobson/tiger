@@ -2,6 +2,7 @@
 
 (require "intermediate-ast.rkt" "types.rkt" "primop.rkt" "unique.rkt")
 (require racket/match racket/list)
+(require racket/pretty)
 
 (provide (rename-out (fix-loops-top fix-loops)))
 
@@ -135,6 +136,8 @@
 
 (: fix-loops (expression type-environment -> expression))
 (define (fix-loops expr env)
+
+
  (: fix-loops-fun (type-environment -> ((Pair unique function) -> (Pair unique function))))
  (define ((fix-loops-fun env) fun)
   (cons (car fun)

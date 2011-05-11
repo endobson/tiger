@@ -4,7 +4,7 @@
 (require racket/match)
 (provide unique gen-uniq re-uniq unique->symbol unique?)
 
-(define-struct: unique ((name : Symbol) (index : Exact-Positive-Integer)))
+(define-struct: unique ((name : Symbol) (index : Exact-Positive-Integer)) #:transparent)
 
 
 

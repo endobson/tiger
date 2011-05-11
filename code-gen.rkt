@@ -43,6 +43,11 @@
       module)))))
   
 
+(define (add-helper-functions)
+ (llvm-add-function
+  (llvm-function-type (llvm-int-type) (llvm-pointer-type (llvm-int8-type)) (llvm-pointer-type (llvm-int8-type)))
+  "strcmp"))
+
 
 
 (define (compile-program prog)
@@ -54,6 +59,7 @@
 
 
   (define-values (ext-functions ext-closures) (add-external-functions))
+  (define helper-functions (add-helper-functions))
 
   (define main-function
     (llvm-add-function
@@ -219,6 +225,7 @@
    ((array-set!-primop type) (compile-array-set! type (first vals) (second vals) (third vals)))
 
    ((box-set!-primop type) (compile-box-set! type (first vals) (second vals)))
+   ((field-set!-primop type name) (compile-field-set! type name (first vals) (second vals)))
 
 
    ((call-closure-primop ty) (compile-closure-call (first vals) (rest vals)))
@@ -244,8 +251,9 @@
   (cond
    ((or (int-type? type) (box-type? type) (array-type? type) (record-type? type))
     (llvm-zext ((if equal llvm-= llvm-/=) v1 v2) (llvm-int-type)))
+   ((string-type? type) (error 'compile-equality-test "String Equality: Not yet implemented"))
     
-   (else (error 'compile-equality-test "Not yet implemented"))))
+   (else (error 'compile-equality-test "Not yet implemented for type ~a" type))))
 
 
  (define (compile-create-record type vals)
@@ -256,6 +264,9 @@
 
  (define (compile-field-ref type name val)
   (llvm-load (llvm-gep val 0 (record-type-field-index type name))))
+
+ (define (compile-field-set! type name record val)
+  (llvm-store val (llvm-gep record 0 (record-type-field-index type name))))
 
 
  (define (compile-create-array type size val)

@@ -2,6 +2,7 @@
 
 (require "intermediate-ast.rkt" "types.rkt" "primop.rkt" "unique.rkt")
 (require racket/match racket/list)
+(require racket/pretty)
 
 (provide remove-assignment)
 
@@ -86,7 +87,29 @@
           (primop-expr (create-box-primop new-ty) (list (fix expr))) (fix body)))
         (bind name ty (fix expr) (fix body))))
    ((bind-rec functions body)
-    (bind-rec (map fix-function functions) (fix body)))
+    (let* ((fun-names (map (inst car unique function) functions))
+           (mutated-names (filter (lambda: ((un : unique)) (hash-has-key? mutated un)) fun-names))
+           (mutated-new-names (make-immutable-hash (map (inst cons unique unique) mutated-names (map re-uniq mutated-names))))
+           (mutation? (not (empty? mutated-names))))
+     (if mutation?
+         (let* ((new-names (map (lambda: ((name : unique)) (hash-ref mutated-new-names name (lambda () name))) fun-names))
+                (new-functions (map (lambda: ((name : unique) (fun : (Pair unique function))) (cons name (cdr fun))) new-names functions)))
+          (let ((inside-body 
+                 (bind-rec (map fix-function new-functions)
+                  (foldl (lambda: ((name : unique) (body : expression))
+                           (bind (gen-uniq 'ignore)
+                                 unit-type
+                                 (primop-expr (box-set!-primop (make-box-type (hash-ref mutated name)))
+                                              (list (identifier name) (identifier (hash-ref mutated-new-names name))))
+                                 body))
+                      (fix body) mutated-names))))
+           (foldl (lambda: ((name : unique) (body : expression))
+                    (let ((new-type (make-box-type (hash-ref mutated name))))
+                      (bind name  new-type (primop-expr (create-box-primop new-type) (list (primop-expr (undefined-primop (hash-ref mutated name)) (list))))
+                       body)))
+                  inside-body
+                  mutated-names)))
+         (bind-rec (map fix-function functions) (fix body)))))
    ((while-loop guard body)
     (while-loop (fix guard) (fix body)))
    ((for-loop id init final body)
@@ -114,7 +137,7 @@
                                   (or new old)) mut-args arg-names)))
        (function (map (inst cons unique type) new-arg-names arg-types) ty
         (for/fold: : expression
-          ((expr : expression body))
+          ((expr : expression (fix body)))
           ((new : (Option unique) mut-args)
            (old : unique arg-names)
            (ty : type arg-types))

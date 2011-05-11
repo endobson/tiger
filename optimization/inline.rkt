@@ -2,6 +2,11 @@
 
 (require "../types.rkt" "../ir-anf-ast.rkt" "../primop.rkt" "alpha-rename.rkt" "../unique.rkt")
 
+(require "../ir-anf-printable-ast.rkt")
+
+(require/typed racket/pretty
+ (pretty-write (Any -> Void)))
+
 (require racket/match racket/list)
 
 

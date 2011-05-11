@@ -57,6 +57,41 @@
      (llvm-set-position (llvm-add-block-to-function not-function))
      (llvm-ret (llvm-zext (llvm-= 0 (llvm-get-param 1)) (llvm-int-type)))
      (values name not-function))
+
+    ((itoa)
+     (define llvm-type (convert-function-type type))
+     ;(define real-function (llvm-add-function (llvm-function-type (llvm-int8-type)) "itoa"))
+     (define function (llvm-add-function llvm-type "itoa_clos"))
+     (llvm-set-position (llvm-add-block-to-function function))
+     (let ((string (llvm-alloc-string 1)))
+       (llvm-store 1 (llvm-gep string 0 0))
+       (llvm-store (llvm-int 90 (llvm-int8-type)) (llvm-gep string 0 1 0))
+       (llvm-ret string))
+     (values name function))
+
+
+    ((readline)
+     (define llvm-type (convert-function-type type))
+     ;(define real-function (llvm-add-function (llvm-function-type (llvm-int8-type)) "itoa"))
+     (define function (llvm-add-function llvm-type "readline_clos"))
+     (llvm-set-position (llvm-add-block-to-function function))
+     (let ((string (llvm-alloc-string 1)))
+       (llvm-store 1 (llvm-gep string 0 0))
+       (llvm-store (llvm-int 88 (llvm-int8-type)) (llvm-gep string 0 1 0))
+       (llvm-ret string))
+     (values name function))
+
+
+
+    ((atoi)
+     (define llvm-type (convert-function-type type))
+     ;(define real-function (llvm-add-function (llvm-function-type (llvm-int8-type)) "itoa"))
+     (define function (llvm-add-function llvm-type "atoi_clos"))
+     (llvm-set-position (llvm-add-block-to-function function))
+     (llvm-ret 0)
+     (values name function))
+
+
     ((getchar)
      (define llvm-type (convert-function-type type))
      (define real-function (llvm-add-function (llvm-function-type (llvm-int8-type)) "getchar"))

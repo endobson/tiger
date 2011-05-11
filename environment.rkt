@@ -28,7 +28,11 @@
      not
      exit
      int
-     string)))
+     string
+     itoa
+     atoi
+     readline
+     )))
 
 
 

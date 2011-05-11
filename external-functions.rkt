@@ -36,6 +36,9 @@
 (: external-function-database (HashTable Symbol function-type))
 (define external-function-database
  (external-functions
+  (itoa (int -> string))
+  (atoi (string -> int))
+  (readline (-> string))
   (print (string -> unit))
   (flush (-> unit))
   (getchar (-> string))

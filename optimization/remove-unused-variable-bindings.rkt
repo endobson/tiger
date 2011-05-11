@@ -1,6 +1,7 @@
 #lang typed/racket/base
 
 (require "../ir-anf-ast.rkt" "side-effects.rkt" "../primop.rkt")
+(require "../ir-anf-printable-ast.rkt" racket/pretty)
 (require racket/match racket/list)
 
 
