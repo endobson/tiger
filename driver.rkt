@@ -133,7 +133,7 @@
      ((unix)
       (system* "/usr/bin/env" "as" "-march" "i686" "-o" (path->string object) (path->string assembly)))
      (else (error 'compile-llvm "Unknown System type")))
-    (system* "/usr/bin/env" "clang" (path->string object) "-o" (path->string exe-path))))))
+    (system* "/usr/bin/env" "clang" (path->string object) "-l" "m" "-o" (path->string exe-path))))))
 
 
 

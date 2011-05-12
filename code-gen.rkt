@@ -57,8 +57,9 @@
 
 
 
-
-  (define-values (ext-functions ext-closures) (add-external-functions))
+  (define stdin-global (llvm-add-global (llvm-pointer-type (llvm-int8-type)) "stdin-file"))
+  (llvm-set-initializer stdin-global (llvm-null (llvm-pointer-type (llvm-int8-type))))
+  (define-values (ext-functions ext-closures) (add-external-functions stdin-global))
   (define helper-functions (add-helper-functions))
 
   (define main-function
@@ -149,6 +150,7 @@
   ((function-type? type) (llvm-ptr-to-int value))
   ((box-type? type) (llvm-ptr-to-int value))
   ((array-type? type) (llvm-ptr-to-int value))
+  ((string-type? type) (llvm-ptr-to-int value))
   (else (error 'int-cast "Unsupported-type ~a" type))))
 
 
@@ -241,9 +243,9 @@
  (define (compile-string-constant str)
   (define str-length (string-length str))
   (define (llvm-str-type n) (llvm-struct-type (llvm-int-type) (llvm-array-type (llvm-int8-type) n)))
-  (define llvm-str (llvm-add-global (llvm-str-type str-length) ""))
+  (define llvm-str (llvm-add-global (llvm-str-type (add1 str-length)) ""))
   (llvm-set-initializer llvm-str
-    (llvm-struct str-length str))
+    (llvm-struct str-length (string-append str "\0")))
   (llvm-bit-cast llvm-str (convert-type string-type)))
   
 
@@ -251,7 +253,10 @@
   (cond
    ((or (int-type? type) (box-type? type) (array-type? type) (record-type? type))
     (llvm-zext ((if equal llvm-= llvm-/=) v1 v2) (llvm-int-type)))
-   ((string-type? type) (error 'compile-equality-test "String Equality: Not yet implemented"))
+   ((string-type? type)
+    (let ((strcmp (llvm-get-named-function "strcmp")))
+     (llvm-zext ((if equal llvm-= llvm-/=) 0 (llvm-call strcmp (llvm-gep v1 0 1 0) (llvm-gep v2 0 1 0))) (llvm-int-type))))
+   
     
    (else (error 'compile-equality-test "Not yet implemented for type ~a" type))))
 
