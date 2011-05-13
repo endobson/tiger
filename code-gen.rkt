@@ -57,8 +57,7 @@
 
 
 
-  (define stdin-global (llvm-add-global (llvm-pointer-type (llvm-int8-type)) "stdin-file"))
-  (llvm-set-initializer stdin-global (llvm-null (llvm-pointer-type (llvm-int8-type))))
+  (define stdin-global (llvm-add-global (llvm-pointer-type (llvm-int8-type)) "stdin"))
   (define-values (ext-functions ext-closures) (add-external-functions stdin-global))
   (define helper-functions (add-helper-functions))
 
@@ -236,6 +235,7 @@
    ((runtime-primop type name)
     (hash-ref initial-env op (lambda () (error 'compile-primop "Unknown runtime-primop ~a" op))))
    ((equality-primop equal type) (compile-equality-test equal type (first vals) (second vals)))
+   ((comparison-primop sym type) (compile-comparison sym type (first vals) (second vals)))
    (else (error 'compile-primop "Unsupported primop: ~a" op))))
 
 
@@ -310,6 +310,29 @@
    (llvm-store val (llvm-gep array 0 1 index)))
 
 
+
+
+
+ (define (compile-comparison op type l r)
+   (define (up-convert x)
+     (llvm-zext x (llvm-int-type)))
+
+   (cond 
+    ((int-type? type)
+      ((case op
+         ((<=) (compose up-convert llvm-<=))
+         ((>=) (compose up-convert llvm->=))
+         ((<) (compose up-convert llvm-<))
+         ((>) (compose up-convert llvm->))
+         (else (error 'compile "comparison operator ~a not yet implemented" op))) l r))
+    ((string-type? type)
+     (define strcmp (llvm-get-named-function "strcmp"))
+     (let ((val (llvm-call strcmp (llvm-gep l 0 1 0) (llvm-gep r 0 1 0))))
+      ((case op
+        ((<=) (compose up-convert llvm-<=))
+        ((>=) (compose up-convert llvm->=))
+        ((<) (compose up-convert llvm-<))
+        ((>) (compose up-convert llvm->))) val 0)))))
 
 
 

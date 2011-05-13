@@ -285,6 +285,22 @@
               (values (math op left right) l-type)
               (error 'type-check "The right expression of the math operation ~a, ~a had type ~a instead of int" op right r-type))
           (error 'type-check "The left expression of the math operation ~a, ~a had type ~a instead of int" op left l-type))))
+
+    ((comparison op left right type)
+     (if type
+         (error "Already annotated comparison: ~a" prog)
+         (let-values (((left l-type) (recur left))
+                      ((right r-type) (recur right)))
+          (let: ((res-type : value-type
+                 (cond
+                  ((and (int-type? l-type) (int-type? r-type))
+                   int-type)
+                  ((and (string-type? l-type) (string-type? r-type))
+                   string-type)
+
+                  (else
+                   (error 'type-check "Type ~a and ~a cannot be compared" l-type r-type)))))
+            (values (comparison op left right (unresolve-type res-type env)) int-type)))))
     ((equality op left right type)
      (if type
          (error "Already annotated equality: ~a" prog)
@@ -462,6 +478,9 @@
        (error 'nil-annotate "Unannotated function call")))
      ((math op left right)
       (math op (recur left) (recur right)))
+     ((comparison op left right ty)
+      (comparison op (recur left) (recur right) ty))
+     
      ((equality op left right ty)
       (if ty
           (equality op ((search ty env) left) ((search ty env) right) ty)

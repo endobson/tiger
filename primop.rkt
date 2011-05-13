@@ -27,12 +27,14 @@
     create-array-primop
     create-record-primop
     equality-primop
+    comparison-primop
     
     
     ))
 
-(define-struct: math-primop ((symbol : (U '+ '- '* '/ '<= '>= '< '> '& '\|))) #:transparent)
+(define-struct: math-primop ((symbol : (U '+ '- '* '/ '& '\|))) #:transparent)
 (define-struct: equality-primop ((equality : Boolean) (type : type)) #:transparent)
+(define-struct: comparison-primop ((symbol : (U '< '> '<= '>=)) (type : (U Int-Type String-Type))) #:transparent)
 (define-struct: unit-primop () #:transparent)
 (define-struct: undefined-primop ((type : type)) #:transparent)
 (define-struct: call-closure-primop ((type : function-type)) #:transparent)
@@ -79,12 +81,14 @@
     ((-) 'minus)
     ((*) 'times)
     ((/) 'divide)
+    ((&) 'and)
+    ((\|) 'or)))
+  ((comparison-primop op ty)
+   (case op
     ((<=) 'less-then-equal)
     ((>=) 'greater-then-equal)
     ((>) 'greater)
-    ((<) 'less)
-    ((&) 'and)
-    ((\|) 'or)))
+    ((<) 'less)))
   ((equality-primop eql type) (if eql 'equal 'not-equal))
   ((call-closure-primop ty) 'call)
   ((create-box-primop ty) 'create-box)
@@ -114,6 +118,7 @@
   ((math-primop sym)
    (list int-type int-type))
   ((equality-primop eql ty) (list ty ty))
+  ((comparison-primop sym ty) (list ty ty))
   ((call-closure-primop ty)
    (cons ty (function-type-arg-types ty)))
   ((call-known-function-primop ty name)

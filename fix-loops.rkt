@@ -110,7 +110,7 @@
                                               (list
                                                (primop-expr (integer-constant-primop 1) empty)
                                                (identifier var))))))))
-                          (conditional (primop-expr (math-primop '<=) (list (identifier var) (identifier final-name)))
+                          (conditional (primop-expr (comparison-primop '<= int-type) (list (identifier var) (identifier final-name)))
                             (cps body (continuation (identifier cont-name) (continuation-type unit-type)) (hash-set env var int-type))
                             (primop-expr (unit-primop) empty)
                             unit-type)))))

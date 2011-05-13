@@ -11,6 +11,7 @@
     lvalue
     sequence
     assignment
+    comparison
     if-then-else
     Constant
     negation
@@ -52,8 +53,9 @@
 (define-struct: function-call ((fun : expression) (args : (Listof expression)) (type : (Option type-reference))) #:transparent)
 
 (define-struct: negation ((expr : expression)) #:transparent)
+(define-struct: comparison ((operator : (U '< '> '<= '>=)) (left : expression) (right : expression) (type : (Option type-reference))))
 (define-struct: equality ((operator : (U  '= '<> )) (left : expression) (right : expression) (type : (Option type-reference))) #:transparent)
-(define-struct: math ((operator : (U '+ '* '/ '- '< '> '<= '>= '& '\| )) (left : expression) (right : expression)) #:transparent)
+(define-struct: math ((operator : (U '+ '* '/ '-  '& '\| )) (left : expression) (right : expression)) #:transparent)
 
 (define-struct: create-record ((type : type-reference) (fields : (Listof (Pair Symbol expression)))) #:transparent)
 (define-struct: create-array ((type : type-reference) (size : expression) (value : expression)) #:transparent)

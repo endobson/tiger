@@ -69,7 +69,20 @@
          (lambda () (error 'transform "Unbound identifier ~a in ~a and ~a" name env global-env)))
         empty))))
     ((source:math symbol left right)
-     (inter:primop-expr (math-primop symbol) (list (recur left) (recur right))))
+     (cond
+      ((member symbol '(& \|))
+       (let ((name (gen-uniq (if (equal? symbol '&) 'and 'or))))
+        (inter:bind name inter:int-type (recur left)
+         (inter:conditional (inter:primop-expr (equality-primop (equal? symbol '&) inter:int-type) (list (inter:identifier name)
+                              (inter:primop-expr (integer-constant-primop 0) empty)))
+          (inter:identifier name)
+          (recur right) inter:int-type))))
+      (else 
+       (inter:primop-expr (math-primop symbol) (list (recur left) (recur right))))))
+    ((source:comparison symbol left right type)
+     (if type
+         (inter:primop-expr (comparison-primop symbol (assert (lookup-type-reference type type-env)  inter:int-string-type?)) (list (recur left) (recur right)))
+         (error 'transform "Unannotated comparison: ~a" prog)))
     ((source:equality symbol left right type)
      (if type
          (inter:primop-expr (equality-primop (equal? symbol '=) (lookup-type-reference type type-env)) (list (recur left) (recur right)))

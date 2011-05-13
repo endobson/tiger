@@ -170,7 +170,7 @@
           ((expr */ expr) (make-math $2 $1 $3))
           ((expr and expr) (make-math '& $1 $3))
           ((expr or expr) (make-math '\| $1 $3))
-          ((expr comparison expr) (make-math $2 $1 $3))
+          ((expr comparison expr) (make-comparison $2 $1 $3 #f))
           ((expr equal expr) (make-equality '= $1 $3 #f))
           ((expr not-equal expr) (make-equality '<> $1 $3 #f))
 

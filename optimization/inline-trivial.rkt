@@ -24,6 +24,7 @@
       ((runtime-primop ty name) 1)
       ((math-primop sym) 1)
       ((equality-primop eql ty) 1)
+      ((comparison-primop eql ty) 1)
       ((call-closure-primop ty) 1)
       ((call-known-function-primop ty name) 1)
       ((call-known-runtime-primop ty name) 1)

@@ -33,12 +33,14 @@
 
 
 
+
  (rename-out
   (f-type function-type)
   (a-type array-type)
   (r-type record-type)
   (b-type box-type))
 
+ int-string-type?
  function-type?
  record-type?
  array-type?
@@ -135,6 +137,7 @@
 
 (define-predicate primitive-type? primitive-type)
 (define-predicate type? type)
+(define-predicate int-string-type? (U int-type string-type))
 (define-predicate proto-type? proto-type)
 (define-predicate proto-ref-type? proto-ref-type)
 
