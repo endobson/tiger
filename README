@@ -1,0 +1,45 @@
+Optimizations are located in the optimization folder.
+
+Features:
+ Function inlining, and known function call optimization.
+ 0CFA to determine which functions are called from where.
+ Constant propogation was the next optimization but did not get implemented.
+ ANF itermediate code form.
+ Boxing of all mutation.
+ Code generation to LLVM.
+
+Pipeline:
+ Parse/Lex source code in to source ast.
+ Typecheck/Semantic checks.
+ Convert to intermediat ast. 
+  -All types are now embedded into the operations (No more type environment)
+  -Normalize all primitive operations
+ Remove mutation by Boxing everything that is mutated. Non mutated things remain unboxed.
+ Remove loops by locally cpsing. This allows removal of the break primitive. 
+ Turn into ANF representation.
+ Do Optimizations.
+ Lift functions to toplevel by adding explicit free variables to each function.
+ Compile to LLVM.
+ Pass to llvm optimizer, and then produce executable.
+
+Compiling:
+ You need Racket 5.1.1 (older versions may work, havn't tested)
+ $ sourcefile /pro/plt/software/racket/latest/std/config
+ You need to install a racket development link for my llvm package (available on github)
+ $ raco planet link  endobson llvm.plt 1 0 ~endobson/proj/racket/planet/5.1.1/llvm/1.0
+ 
+ raco make tiger.rkt tiger-server.rkt
+
+Tests:
+ Tests are available on github and in the tests directory (it is a different git repo)
+
+ run-tests is the main script. Has a helpful message when called with --help.
+ 
+ Main way to run is tests/run-tests -s
+
+Running:
+ tiger is the main executable. Usage is documented through --help option.
+
+ Main way is:
+  ./tiger test.tiger -o test
+  ./test
