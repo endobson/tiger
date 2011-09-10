@@ -126,14 +126,14 @@
   (with-temporary-file assembly
    (with-temporary-file object
     (write-program program bitcode)
-    (system* "/usr/bin/env" "llc" "-O2" "-o" (path->string assembly) (path->string bitcode))
+    (system* "/usr/bin/env" "llc" "-O2" "-disable-cfi" "-march" "x86" "-o" (path->string assembly) (path->string bitcode))
     (case (system-type 'os)
      ((macosx)
       (system* "/usr/bin/env" "as" "-arch" "i686" "-o" (path->string object) (path->string assembly)))
      ((unix)
       (system* "/usr/bin/env" "as" "-march" "i686" "-o" (path->string object) (path->string assembly)))
      (else (error 'compile-llvm "Unknown System type")))
-    (system* "/usr/bin/env" "clang" (path->string object) "-l" "m" "-o" (path->string exe-path))))))
+    (system* "/usr/bin/env" "clang" (path->string object) "-Wl,-no_pie" "-l" "m"  "-arch" "i386" "-o" (path->string exe-path))))))
 
 
 

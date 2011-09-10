@@ -57,7 +57,7 @@
 
 
 
-  (define stdin-global (llvm-add-global (llvm-pointer-type (llvm-int8-type)) "stdin"))
+  (define stdin-global (llvm-add-global (llvm-pointer-type (llvm-int8-type)) "__stdinp"))
   (define-values (ext-functions ext-closures) (add-external-functions stdin-global))
   (define helper-functions (add-helper-functions))
 

@@ -23,11 +23,12 @@
   (llvm-add-function (llvm-function-type i8* i8* i8* (llvm-int-type)) "memcpy"))
 
  (define (make-closure funval type name)
-  (define closure  (llvm-add-global (machine-closure-type type) name))
+  (define cl-type (machine-closure-type type))
+  (define closure (llvm-add-global cl-type name))
   (LLVMSetLinkage closure 'LLVMPrivateLinkage)
   (llvm-set-initializer
    closure
-   (llvm-struct funval (llvm-array (llvm-int-type))))
+   (llvm-named-struct cl-type funval (llvm-array (llvm-int-type))))
   closure)
   
 
