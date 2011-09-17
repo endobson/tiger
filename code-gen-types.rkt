@@ -2,8 +2,7 @@
 
 
 (require
- (planet endobson/llvm/llvm-simple)
- (planet endobson/llvm/llvm)) 
+ (planet endobson/llvm/simple))
 
 (require racket/list)
 (require  "types.rkt" )

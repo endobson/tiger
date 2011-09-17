@@ -1,8 +1,11 @@
 #lang racket/base
 
 (require
- (planet endobson/llvm/llvm-simple)
- (planet endobson/llvm/llvm))
+ (planet endobson/llvm/simple)
+ (only-in
+   (planet endobson/llvm/safe)
+   LLVMSetLinkage
+   LLVMSetFunctionCallConv))
 
 
 (require racket/match racket/list)

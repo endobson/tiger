@@ -1,8 +1,20 @@
 #lang racket/base
 
 (require
- (planet endobson/llvm/llvm-simple)
- (planet endobson/llvm/llvm)) 
+ (planet endobson/llvm/simple)
+ (only-in
+   (planet endobson/llvm/unsafe)
+   LLVMCreateMemoryBufferWithContentsOfFile
+   LLVMParseBitcode
+   LLVMDisposeMemoryBuffer )
+ (only-in
+   (planet endobson/llvm/safe)
+   LLVMContextCreate
+   LLVMSetLinkage
+   LLVMSetFunctionCallConv
+   LLVMSetInstructionCallConv
+   LLVMSetTailCall))
+
 
 (require (for-syntax racket/base))
 (require racket/file racket/system racket/match racket/list unstable/hash)

@@ -5,7 +5,7 @@
 (require "driver.rkt" "ir-anf-printable-ast.rkt")
 (require racket/cmdline racket/pretty)
 
-(require (planet endobson/llvm/llvm-simple))
+(require (planet endobson/llvm/simple))
 
 (define-values (source-path destination-path output-mode) 
  (let ((source-path #f) (destination-path 'default) (output-mode 'binary))
